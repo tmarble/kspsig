@@ -6,6 +6,7 @@
 # Licensed under GPLv3 or later  http://www.gnu.org/licenses/gpl-3.0.txt
 # 
 # Key Signing Party signature verification tool
+# http://github.com/tmarble/kspsig
 
 import os, os.path, sys
 import GnuPGInterface, tempfile
