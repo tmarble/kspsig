@@ -1,0 +1,64 @@
+kspsig
+------
+
+Key Signing Party signature verification tool
+
+If  you  are  concerned  about  the  hash algorithm strength used 
+in key signing this tool seeks to answer questions you may have 
+following a key signing party...
+- How strongly did others sign my key?
+- How strongly did I sign other's keys?
+- How strong are the signatures for my key?
+
+This tool only reads keyrings: it does not do any key modifications.
+
+See the man page for additional documentation and examples
+
+
+Requirements
+------------
+
+Depends on python 2.6 and assumes that gpg is installed.  
+Although not strictly required it is assumed that caff is also installed.
+
+The man page can be regenerated using help2man with:
+$ help2man --output kspsig.1 --include=kspsig.h2m kspsig
+
+License
+-------
+
+Copyright (c) 2010 Tom Marble
+
+Licensed under GPLv3 or later  http://www.gnu.org/licenses/gpl-3.0.txt
+The full text of the license is available in LICENSE and
+on Debian (and derived) systems you may find the full text of the
+license in /usr/share/common-licenses/GPL-3
+
+
+Download
+--------
+
+You can find the latest version of kspsig at:
+
+
+
+
+See Also
+--------
+
+gpg(1)
+caff(1)
+http://www.debian-administration.org/users/dkg/weblog/48
+http://keyring.debian.org/creating-key.html
+http://lists.debian.org/debian-devel-announce/2009/05/msg00005.html
+http://www.gag.com/bdale/blog/posts/Strong_Keys.html
+
+
+To Do
+-----
+
+- Peer review of the approach of using gpg --export and 
+  gpg --list-packets
+- Consider rewriting with direct access to the keyrings
+
+
