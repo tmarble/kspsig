@@ -1,54 +1,8 @@
 #!/usr/bin/make -f
-# -*- makefile -*-
 
-# Uncomment this to turn on verbose mode.
-#export DH_VERBOSE=1
+%: 
+	dh $@
 
-VERSION := $(shell dpkg-parsechangelog | grep '^Version: ' | awk '{print $$2}')
-
-
-build: build-stamp
-build-stamp:
-	dh_testdir
-	touch $@
-
-clean:
-	dh_testdir
-	dh_testroot
-	rm -f build-stamp
-	dh_clean
-
-man: man-stamp
-man-stamp: 
+override_dh_auto_build:
+	dh_auto_build
 	help2man --output kspsig.1 --include=kspsig.h2m ./kspsig
-	touch $@
-
-install: build man
-	dh_testdir
-	dh_testroot
-	dh_clean
-	dh_installdirs -i
-	dh_installman kspsig.1
-
-# Build architecture-independent files here.
-binary-indep: build install
-	dh_testdir
-	dh_testroot
-	dh_installchangelogs -i
-	dh_installdocs -i
-	dh_install -i
-	dh_compress  -i
-	dh_fixperms -i
-	dh_pysupport -d -i
-	dh_installdeb -i
-	dh_shlibdeps -i
-	dh_gencontrol -i
-	dh_md5sums -i
-	dh_builddeb -i
-
-# Build architecture-dependent files here.
-binary-arch: build install
-# We have nothing to do by default.
-
-binary: binary-indep binary-arch
-.PHONY: build clean binary-indep binary-arch binary install
