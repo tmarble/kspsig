@@ -1,0 +1,15 @@
+This package was debianized by 
+  Tom Marble <tmarble@info9.net> on Mon 30th August 2010.
+
+The source was downloaded from http://github.com/tmarble/kspsig
+
+Copyright (c) 2007 Tom Marble
+
+Licensed under the GPLv3 or later.
+
+On Debian GNU/Linux systems, the complete text of the GNU General
+Public License can be found in `/usr/share/common-licenses/GPL-3'.
+
+The full text of the license is available in LICENSE and
+at http://www.gnu.org/licenses/gpl-3.0.txt
+
