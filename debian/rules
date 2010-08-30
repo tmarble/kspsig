@@ -6,6 +6,7 @@
 
 VERSION := $(shell dpkg-parsechangelog | grep '^Version: ' | awk '{print $$2}')
 
+
 build: build-stamp
 build-stamp:
 	dh_testdir
@@ -15,20 +16,19 @@ clean:
 	dh_testdir
 	dh_testroot
 	rm -f build-stamp
-	rm -f $(manpages)
 	dh_clean
 
-install: build
+man: man-stamp
+man-stamp: 
+	help2man --output kspsig.1 --include=kspsig.h2m ./kspsig
+	touch $@
+
+install: build man
 	dh_testdir
 	dh_testroot
 	dh_clean
 	dh_installdirs -i
-
-manpages = debian/kspsig.1
-common-binary-indep:: $(manpages)
-$(manpages): install/kspsig
-$(manpages): debian/%.1 : %
-	help2man --output kspsig.1 --include=kspsig.h2m kspsig
+	dh_installman kspsig.1
 
 # Build architecture-independent files here.
 binary-indep: build install
