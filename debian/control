@@ -1,0 +1,20 @@
+Source: kspsig
+Section: utils
+Priority: optional
+Maintainer: Tom Marble <tmarble@info9.net>
+Build-Depends: debhelper (>= 8), python, help2man
+Build-Depends-Indep: python-support (>= 1.0.9)
+Standards-Version: 3.9.1
+
+Package: kspsig
+Architecture: all
+Depends: ${python:Depends}, python-gnupginterface
+Description: Key Signing Party signature verification tool
+  If  you  are  concerned  about  the  hash algorithm strength used 
+  in key signing this tool seeks to answer questions you may have 
+  following a key signing party...
+  - How strongly did others sign my key?
+  - How strongly did I sign other's keys?
+  - How strong are the signatures for my key?
+  .
+  This tool only reads keyrings: it does not do any key modifications.

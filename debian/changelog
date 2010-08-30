@@ -1,0 +1,6 @@
+kspsig (0.1-1) unstable; urgency=low
+
+  * Initial Debian packaging
+
+ -- Tom Marble <tmarble@info9.net>  Mon, 30 Aug 2010 08:21:33 -0500
+
