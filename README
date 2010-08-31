@@ -15,6 +15,20 @@ This tool only reads keyrings: it does not do any key modifications.
 See the man page for additional documentation and examples
 
 
+News
+----
+An ITP has been filed for this program #594907
+  http://bugs.debian.org/cgi-bin/bugreport.cgi?bug=594907
+
+However it has been suggested that it be combined with signing-party
+and thus the following bug has been opened #595060
+  http://bugs.debian.org/cgi-bin/bugreport.cgi?bug=595060
+
+In the meantime you may add this package to a Debian unstable
+system by adding the info9 repository as a source:
+  http://info9.net/debian/info9.list
+
+
 Requirements
 ------------
 
