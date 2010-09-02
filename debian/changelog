@@ -7,7 +7,7 @@ kspsig (0.2) unstable; urgency=low
 
   * Added missing Build-Depends: python-gnupginterface
 
- --
+ -- Tom Marble <tmarble@info9.net>  Wed, 01 Sep 2010 22:17:20 -0500
 
 kspsig (0.1) unstable; urgency=low
 
