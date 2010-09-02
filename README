@@ -17,6 +17,7 @@ See the man page for additional documentation and examples
 
 News
 ----
+
 An ITP has been filed for this program #594907
   http://bugs.debian.org/cgi-bin/bugreport.cgi?bug=594907
 
@@ -32,11 +33,12 @@ system by adding the info9 repository as a source:
 Requirements
 ------------
 
-Depends on python 2.6 and assumes that gpg is installed.  
+Depends on python 2.6 and python-gnupginterface (and thus gpg).
 Although not strictly required it is assumed that caff is also installed.
 
 The man page can be regenerated using help2man with:
 $ help2man --output kspsig.1 --include=kspsig.h2m kspsig
+
 
 License
 -------
@@ -56,6 +58,52 @@ You can find the latest version of kspsig at:
 http://github.com/tmarble/kspsig
 
 
+Configuring caff
+----------------
+
+Configuring caff to use a strong hash algorithm for signatures
+is a little tricky... If you haven't already please consider
+adding "cert-digest-algo  SHA512" to ~/.gnupg/gpg.conf and then
+insure caff uses your default GnuPG config file as follows:
+$ mv ~/.caff/gnupghome/gpg.conf ~/.caff/gnupghome/gpg.conf.old
+$ ln -s ~/.gnupg/gpg.conf ~/.caff/gnupghome/gpg.conf
+
+You can verify the caff signature preference with:
+$ grep cert-digest-algo ~/.gnupg/gpg.conf ~/.caff/gnupghome/gpg.conf
+/home/USER/.gnupg/gpg.conf:cert-digest-algo SHA512
+/home/USER/.caff/gnupghome/gpg.conf:cert-digest-algo SHA512
+$ 
+
+
+Fixing weak signatures
+----------------------
+
+Once you have caff configured for a strong signature algorithm
+you may be asked to re-sign some keys.  Here is an approach:
+
+1. Delete the weak signature(s) on your signature (caff) keyring
+   (e.g. you signed DEADCAFF with SHA1):
+
+  $ gpg --homedir=~/.caff/gnupghome --secret-keyring ~/.gnupg/secring.gpg --no-auto-check-trustdb --trust-model=always --edit-key DEADCAFF
+  gpg> uid 1
+  gpg> delsig
+  gpg> save
+
+  NOTE: if you signed multiple uid's for that key will need to
+  select and delete the signature for each.
+
+2. Re-sign with caff
+
+   $ caff --no-download DEADCAFF
+
+3. Verify the new signature
+
+   $ kspsig --outgoing=DEADCAFF
+
+4. If the new signature doesn't use the algorithm you intended
+   then try to reconfigure caff and goto step 1.
+
+
 See Also
 --------
 
@@ -73,6 +121,5 @@ To Do
 - Peer review of the approach of using gpg --export and 
   gpg --list-packets
 - Consider rewriting with direct access to the keyrings
-
 
 

@@ -6,7 +6,7 @@ Homepage: http://github.com/tmarble/kspsig
 Vcs-Browser: http://github.com/tmarble/kspsig
 Vcs-Git: git://github.com/tmarble/kspsig.git
 Standards-Version: 3.9.1
-Build-Depends: debhelper (>= 8), python, help2man
+Build-Depends: debhelper (>= 8), python, python-gnupginterface, help2man
 Build-Depends-Indep: python-support (>= 1.0.9)
 
 Package: kspsig

@@ -1,3 +1,14 @@
+kspsig (0.2) unstable; urgency=low
+
+  * Updated README with suggestions on configuring caff
+    and how to remedy weak signatures
+  
+  [John Stamp, Hector Oron]
+
+  * Added missing Build-Depends: python-gnupginterface
+
+ --
+
 kspsig (0.1) unstable; urgency=low
 
   * Initial Debian packaging (Closes: #594907)
