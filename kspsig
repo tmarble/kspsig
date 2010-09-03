@@ -402,7 +402,7 @@ class KSPSig(object):
         sub += 1
         uidstring = '[subkey %d]' % sub
         n = -1 # first signature number for this subkey will be 0
-      elif tag == 'sig':
+      elif tag == 'sig' or tag == 'rev':
         n += 1
         # find the hashalgo for the nth sig on uid (or sub)
         hashalgo = self.get_hashalgo_name(uidstring, n, keyid)
