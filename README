@@ -26,8 +26,17 @@ and thus the following bug has been opened #595060
   http://bugs.debian.org/cgi-bin/bugreport.cgi?bug=595060
 
 In the meantime you may add this package to a Debian unstable
-system by adding the info9 repository as a source:
-  http://info9.net/debian/info9.list
+system by adding the info9 repository as a source
+  deb http://info9.net/debian/ unstable/
+  deb-src http://info9.net/debian/ unstable/
+
+Optional: if you trust this repository you can add it to your apt-keyring:
+  gpg --recv-key 0x40BFEE868B055D9A
+  gpg --armor --export 0x40BFEE868B055D9A | apt-key add -
+
+deb http://info9.net/debian/ unstable/
+deb-src http://info9.net/debian/ unstable/
+
 
 
 Requirements
@@ -113,7 +122,7 @@ http://www.debian-administration.org/users/dkg/weblog/48
 http://keyring.debian.org/creating-key.html
 http://lists.debian.org/debian-devel-announce/2009/05/msg00005.html
 http://www.gag.com/bdale/blog/posts/Strong_Keys.html
-
+http://www.gnupg.org/faq/weak-digest-algos.html
 
 To Do
 -----
