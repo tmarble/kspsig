@@ -34,10 +34,6 @@ Optional: if you trust this repository you can add it to your apt-keyring:
   gpg --recv-key 0x40BFEE868B055D9A
   gpg --armor --export 0x40BFEE868B055D9A | apt-key add -
 
-deb http://info9.net/debian/ unstable/
-deb-src http://info9.net/debian/ unstable/
-
-
 
 Requirements
 ------------
