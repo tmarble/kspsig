@@ -19,7 +19,7 @@ class KSPSig(object):
 
   def __init__(self):
     self.program = os.path.basename(sys.argv[0])
-    self.version = '0.2'
+    self.version = '0.3'
     self.description = 'Key Signing Party signature verification tool'
     self.action = 'usage'
     self.options = None

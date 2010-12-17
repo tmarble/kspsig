@@ -1,3 +1,11 @@
+kspsig (0.3) unstable; urgency=low
+
+  * Fixed bug where signature revocations prevented displaying hashalgo
+  * Added into9.net example sources.list.d file
+  * Updated README
+
+ -- Tom Marble <tmarble@info9.net>  Thu, 16 Dec 2010 22:57:55 -0600
+
 kspsig (0.2) unstable; urgency=low
 
   * Updated README with suggestions on configuring caff
