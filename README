@@ -28,7 +28,7 @@ and thus the following bug has been opened #595060
 In the meantime you may add this package to a Debian unstable
 system by adding the info9 repository as a source.  The easiest
 way to do this is simply:
-# cp /usr/share/doc/kspsig/info9.net /etc/apt/sources.list.d/ )
+# cp /usr/share/doc/kspsig/info9.net.list /etc/apt/sources.list.d/ )
 
 Or you can add these lines to /etc/apt/sources.list
   deb http://info9.net/debian/ unstable/
