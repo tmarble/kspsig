@@ -6,3 +6,9 @@
 override_dh_auto_build:
 	dh_auto_build
 	help2man --output kspsig.1 --include=kspsig.h2m ./kspsig
+
+get-orig-source:
+	# read debian/watch, download correct version, rename to 
+	# packagename_upstream-version.orig.tar.gz  see also:
+	# http://www.debian.org/doc/developers-reference/best-pkging-practices.html#bpp-origtargz
+	uscan --force-download --rename
