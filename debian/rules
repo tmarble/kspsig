@@ -1,5 +1,13 @@
 #!/usr/bin/make -f
 
+vafilt = $(subst $(2)=,,$(filter $(2)=%,$(1)))
+CHANGELOG_VARS := $(shell dpkg-parsechangelog | sed -n 's/ /_/g;/^[^_]/s/^\([^:]*\):_\(.*\)/\1=\2/p')
+PKGSOURCE  := $(call vafilt,$(CHANGELOG_VARS),Source)
+PKGVERSION := $(call vafilt,$(CHANGELOG_VARS),Version)
+UPSTREAM_TARBALL = v$(PKGVERSION).tar.gz
+SOURCE_DIR = $(PKGSOURCE)-$(PKGVERSION)
+SOURCE_TARBALL = $(PKGSOURCE)_$(PKGVERSION).tar.bz2
+
 %: 
 	dh $@
 
@@ -8,7 +16,19 @@ override_dh_auto_build:
 	help2man --output kspsig.1 --include=kspsig.h2m ./kspsig
 
 get-orig-source:
-	# read debian/watch, download correct version, rename to 
-	# packagename_upstream-version.orig.tar.gz  see also:
+	# read debian/watch, download correct version, 
+	# repackage as ./packagename-upstreamversion named (as native)
+	# packagename_upstreamversion.tar.gz  see also:
 	# http://www.debian.org/doc/developers-reference/best-pkging-practices.html#bpp-origtargz
-	uscan --force-download --rename
+	-@echo PKGSOURCE=$(PKGSOURCE)
+	-@echo PKGVERSION=$(PKGVERSION)
+	-@echo UPSTREAM_TARBALL=$(UPSTREAM_TARBALL)
+	-@echo SOURCE_DIR=$(SOURCE_DIR)
+	-@echo SOURCE_TARBALL=$(SOURCE_TARBALL)
+	mkdir ../tarballs
+	uscan --force-download --no-symlink --destdir ../tarballs
+	tar -C ../tarballs -zxf ../tarballs/$(UPSTREAM_TARBALL)
+	# move github named directory USER-PROJECT-HASH to $(SOURCE_DIR)
+	(cd ../tarballs; mv `ls -1 | grep -v '.tar.gz$$'` $(SOURCE_DIR))
+	tar -C ../tarballs -jcf ../$(SOURCE_TARBALL) ./$(SOURCE_DIR)
+	rm -r ../tarballs
