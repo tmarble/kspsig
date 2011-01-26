@@ -1,5 +1,0 @@
-# debian/watch formatted for uscan(1)
-version=3
-# convert upstream v0.3 to 0.3
-# note trailing slash on gitubredir is required
-opts="uversionmangle=s@^v@@g" http://githubredir.debian.net/github/tmarble/kspsig/ (.*).tar.gz
