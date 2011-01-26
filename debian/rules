@@ -18,7 +18,7 @@ override_dh_auto_build:
 
 get-orig-source:
 	mkdir ../tarballs
-	git clone --no-checkout $(UPSTREAM_VCS) ../tarballs/$(SOURCE_DIR)
+	git clone -q -n $(UPSTREAM_VCS) ../tarballs/$(SOURCE_DIR)
 	( cd ../tarballs/$(SOURCE_DIR); git checkout $(UPSTREAM_VERSION) )
 	rm -f ../$(NATIVE_TARBALL)
 	tar -C ../tarballs -jcf ../$(NATIVE_TARBALL) --exclude='.git*' ./$(SOURCE_DIR)
