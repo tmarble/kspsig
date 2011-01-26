@@ -1,39 +1,25 @@
 #!/usr/bin/make -f
 
-# DEBUG
-# DH_VERBOSE=1
-
 vafilt = $(subst $(2)=,,$(filter $(2)=%,$(1)))
 CHANGELOG_VARS := $(shell dpkg-parsechangelog | sed -n 's/ /_/g;/^[^_]/s/^\([^:]*\):_\(.*\)/\1=\2/p')
 PKGSOURCE  := $(call vafilt,$(CHANGELOG_VARS),Source)
 PKGVERSION := $(call vafilt,$(CHANGELOG_VARS),Version)
-UPSTREAM_TARBALL = v$(PKGVERSION).tar.gz
+UPSTREAM_VCS = git@github.com:tmarble/kspsig.git
+UPSTREAM_VERSION = v$(PKGVERSION)
 SOURCE_DIR = $(PKGSOURCE)-$(PKGVERSION)
-SOURCE_TARBALL = $(PKGSOURCE)_$(PKGVERSION).native.tar.bz2
+NATIVE_TARBALL = $(PKGSOURCE)_$(PKGVERSION).native.tar.bz2
 
 %: 
 	dh $@
 
 override_dh_auto_build:
 	dh_auto_build
-	# DEBUG ONLY
-	# env > /tmp/$(PKGSOURCE)-env.txt
 	help2man --output kspsig.1 --include=kspsig.h2m ./kspsig
 
 get-orig-source:
-	# read debian/watch, download correct version, 
-	# repackage as ./packagename-upstreamversion named (as native)
-	# packagename_upstreamversion.tar.gz  see also:
-	# http://www.debian.org/doc/developers-reference/best-pkging-practices.html#bpp-origtargz
-	-@echo PKGSOURCE=$(PKGSOURCE)
-	-@echo PKGVERSION=$(PKGVERSION)
-	-@echo UPSTREAM_TARBALL=$(UPSTREAM_TARBALL)
-	-@echo SOURCE_DIR=$(SOURCE_DIR)
-	-@echo SOURCE_TARBALL=$(SOURCE_TARBALL)
 	mkdir ../tarballs
-	uscan --force-download --no-symlink --destdir ../tarballs
-	tar -C ../tarballs -zxf ../tarballs/$(UPSTREAM_TARBALL)
-	# move github named directory USER-PROJECT-HASH to $(SOURCE_DIR)
-	(cd ../tarballs; mv `ls -1 | grep -v '.tar.gz$$'` $(SOURCE_DIR))
-	tar -C ../tarballs -jcf ../$(SOURCE_TARBALL) ./$(SOURCE_DIR)
-	rm -r ../tarballs
+	git clone --no-checkout $(UPSTREAM_VCS) ../tarballs/$(SOURCE_DIR)
+	( cd ../tarballs/$(SOURCE_DIR); git checkout $(UPSTREAM_VERSION) )
+	rm -f ../$(NATIVE_TARBALL)
+	tar -C ../tarballs -jcf ../$(NATIVE_TARBALL) --exclude='.git*' ./$(SOURCE_DIR)
+	rm -rf ../tarballs
