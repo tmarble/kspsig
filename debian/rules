@@ -1,23 +1,18 @@
 #!/usr/bin/make -f
 
-# DEBUG
-DH_VERBOSE=1
-
 vafilt = $(subst $(2)=,,$(filter $(2)=%,$(1)))
 CHANGELOG_VARS := $(shell dpkg-parsechangelog | sed -n 's/ /_/g;/^[^_]/s/^\([^:]*\):_\(.*\)/\1=\2/p')
 PKGSOURCE  := $(call vafilt,$(CHANGELOG_VARS),Source)
 PKGVERSION := $(call vafilt,$(CHANGELOG_VARS),Version)
 UPSTREAM_TARBALL = v$(PKGVERSION).tar.gz
 SOURCE_DIR = $(PKGSOURCE)-$(PKGVERSION)
-SOURCE_TARBALL = $(PKGSOURCE)_$(PKGVERSION).native.tar.bz2
+SOURCE_TARBALL = $(PKGSOURCE)_$(PKGVERSION).tar.bz2
 
 %: 
 	dh $@
 
 override_dh_auto_build:
 	dh_auto_build
-	# DEBUG ONLY
-	env > /tmp/$(PKGSOURCE)-env.txt
 	help2man --output kspsig.1 --include=kspsig.h2m ./kspsig
 
 get-orig-source:
