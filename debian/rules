@@ -7,7 +7,7 @@ PKGVERSION := $(call vafilt,$(CHANGELOG_VARS),Version)
 UPSTREAM_VCS = git@github.com:tmarble/kspsig.git
 UPSTREAM_VERSION = v$(PKGVERSION)
 SOURCE_DIR = $(PKGSOURCE)-$(PKGVERSION)
-NATIVE_TARBALL = $(PKGSOURCE)_$(PKGVERSION).native.tar.bz2
+SOURCE_TARBALL = $(PKGSOURCE)_$(PKGVERSION).tar.bz2
 
 %: 
 	dh $@
@@ -16,10 +16,13 @@ override_dh_auto_build:
 	dh_auto_build
 	help2man --output kspsig.1 --include=kspsig.h2m ./kspsig
 
-get-orig-source:
+# NOTE target not get-orig-source: as this is a native package
+# normally building the package will create $(SOURCE_TARBALL)
+# the following target will make a tarball from the latest changelog version
+pull-changelog-revision:
 	mkdir ../tarballs
 	git clone -q -n $(UPSTREAM_VCS) ../tarballs/$(SOURCE_DIR)
 	( cd ../tarballs/$(SOURCE_DIR); git checkout -q $(UPSTREAM_VERSION) )
-	rm -f ../$(NATIVE_TARBALL)
-	tar -C ../tarballs -jcf ../$(NATIVE_TARBALL) --exclude='.git*' ./$(SOURCE_DIR)
+	rm -f ../$(SOURCE_TARBALL)
+	tar -C ../tarballs -jcf ../$(SOURCE_TARBALL) --exclude='.git*' ./$(SOURCE_DIR)
 	rm -rf ../tarballs
