@@ -14,8 +14,6 @@ SOURCE_TARBALL = $(PKGSOURCE)_$(PKGVERSION).tar.bz2
 
 override_dh_auto_build:
 	dh_auto_build
-	# DEBUG ONLY, remove also in clean, kspsig,docs
-	env > env.txt
 	help2man --output kspsig.1 --include=kspsig.h2m ./kspsig
 
 # NOTE target not get-orig-source: as this is a native package

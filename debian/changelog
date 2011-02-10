@@ -1,3 +1,9 @@
+kspsig (0.5) unstable; urgency=low
+
+  * Support alternate formats of *.asc files (ignore filename)
+
+ -- Tom Marble <tmarble@info9.net>  Wed, 09 Feb 2011 18:37:52 -0600
+
 kspsig (0.4) unstable; urgency=low
 
   * Added get-orig-source target to debian/rules

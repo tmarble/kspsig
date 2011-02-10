@@ -19,7 +19,7 @@ class KSPSig(object):
 
   def __init__(self):
     self.program = os.path.basename(sys.argv[0])
-    self.version = '0.4'
+    self.version = '0.5'
     self.description = 'Key Signing Party signature verification tool'
     self.action = 'usage'
     self.options = None
@@ -111,7 +111,13 @@ class KSPSig(object):
         self.options.caffhome = '~/.caff/gnupghome'
       if not self.options.id:
         self.get_id()
-      if not self.is_hex(self.options.id):
+      if self.is_hex(self.options.id):
+        # insure that we have a full 16 digit hex key
+        self.options.id = self.get_string2hex(self.options.id)
+        self.idstring = self.get_hex2string(self.options.id)
+      else:
+        self.idstring = self.options.id
+        # insure that we have a full 16 digit hex key
         hexid = self.get_string2hex(self.options.id)
         if hexid:
           self.options.id = hexid
@@ -462,60 +468,60 @@ class KSPSig(object):
     the second hex string is the signatory ID.
 
     If the user stores all of these (as yet unimported) signatures
-    in a given directory then (since this is the default action)f this 
+    in a given directory then (since this is the default action) this 
     program can be run as simply as:
 
     % kspsig *.asc
+
+    NOTE: function has been expanded to support alternate forms
+    of signature files (e.g. {myid}__{myemail}.asc or *.asc).
     """
     for sigpath in self.args:
       if not os.path.exists(sigpath):
         return self.error('cannot open: %s' % sigpath, 6)
       else:
         sig = os.path.basename(sigpath)
-        if len(sig) != 53 or sig[21:31] != 'signed-by-':
-          return self.error('incoming file not in format "0x1111222233334444.1.signed-by-0x5555666677778888.asc": %s' % sig, 7)
-        else:
-          myid = sig[2:18]
-          keyid = sig[33:49]
-          uidstring = self.get_hex2string(keyid)
-          hashalgo = 0
-          self.gnupg = GnuPGInterface.GnuPG()
-          self.gnupg.options.quiet = 1
-          self.gnupg.options.armor = 1
-          self.gnupg.options.homedir = self.options.gnupghome
-          p1 = self.gnupg.run(['--list-packets', sigpath],
-                              create_fhs=['stdout'])
-          lines = p1.handles['stdout'].readlines()
-          p1.handles['stdout'].close()
-          p1.wait() # process cleanup
-          uid = -1 # first uid will be 0
-          id = ''
-          warning = '' # if issuer does NOT match keyid
-          for line in lines:
-            fields = line.split()
-            if uid >= 0 and len(fields) > 0 and fields[0] == ':public':
-              uid = -2 # special state: discontinue processing
-            elif uid != -2 and len(fields) > 2:
-              if fields[0] == ':user':
-                uid += 1
-                myidstring = line.split('"')[1]
-              elif fields[0] == ':attribute':
-                # NOTE: :attribute is used for a JPEG uid
-                uid += 1 # (starts at 1)
-                myidstring = line[len(':attribute packet: '):-1]
-              elif fields[0] == ':signature':
-                id = fields[5]
-              elif id != myid and fields[0] == 'digest' and fields[1] == 'algo':
-                hashalgo = int(fields[2][:-1])
-                if id != keyid:
-                  warning = ' (issued by: %s = %s)' % (id, self.get_hex2string(id))
-                break
-          fmt = '{sig} {algo:<{pad}} {uidstring}{warning}'
-          print fmt.format(sig=sig,
-                           algo=self.hashalgo_name(hashalgo),
-                           pad=self.hashalgomax,
-                           uidstring=uidstring,
-                           warning=warning)
+        myid = None
+        uidstring = None
+        hashalgo = 0
+        self.gnupg = GnuPGInterface.GnuPG()
+        self.gnupg.options.quiet = 1
+        self.gnupg.options.armor = 1
+        self.gnupg.options.homedir = self.options.gnupghome
+        p1 = self.gnupg.run(['--list-packets', sigpath],
+                            create_fhs=['stdout'])
+        lines = p1.handles['stdout'].readlines()
+        p1.handles['stdout'].close()
+        p1.wait() # process cleanup
+        uid = -1 # first uid will be 0
+        id = ''
+        for line in lines:
+          fields = line.split()
+          if uid >= 0 and len(fields) > 0 and fields[0] == ':public':
+            uid = -2 # special state: discontinue processing
+          elif uid != -2 and len(fields) > 2:
+            if fields[0] == ':user':
+              uid += 1
+              myidstring = line.split('"')[1]
+            elif fields[0] == ':attribute':
+              # NOTE: :attribute is used for a JPEG uid
+              uid += 1 # (starts at 1)
+              myidstring = line[len(':attribute packet: '):-1]
+            elif fields[0] == ':signature':
+              id = fields[5]
+              if myid == None:
+                myid = id
+                if myid != self.options.id:
+                  return self.error('signature file is for %s (not you %s): %s' % (myid, self.options.id, sigpath))
+            elif id != self.options.id and fields[0] == 'digest' and fields[1] == 'algo':
+              uidstring = self.get_hex2string(id)
+              hashalgo = int(fields[2][:-1])
+              break
+        fmt = '{sig} {algo:<{pad}} {uidstring}'
+        print fmt.format(sig=sig,
+                         algo=self.hashalgo_name(hashalgo),
+                         pad=self.hashalgomax,
+                         uidstring=uidstring)
     return 0
   
   def get_hex2string(self, keyid, getuid = 0):
@@ -528,6 +534,7 @@ class KSPSig(object):
     does not have that key in their keyring.  Adding a new can be
     performed with % gpg --recv-keys ID
     """
+
     uidstring = '[User ID not found]'
     self.gnupg = GnuPGInterface.GnuPG()
     self.gnupg.options.quiet = 1
@@ -564,13 +571,16 @@ class KSPSig(object):
     If the ID is not available it is probably because the user
     does not have that key in their keyring.  Adding a new can be
     performed with % gpg --recv-keys ID
+
+    NOTE: will return the full 16 digit hex id
+    This important later on because gpg --list-packets uses 16 digit keys.
     """
     hexid = None
     self.gnupg = GnuPGInterface.GnuPG()
     self.gnupg.options.quiet = 1
     self.gnupg.options.armor = 0
     self.gnupg.options.homedir = self.options.gnupghome
-    p1 = self.gnupg.run(['--list-key', keyid], create_fhs=['stdout', 'stderr'])
+    p1 = self.gnupg.run(['--keyid-format', 'long', '--list-key', keyid], create_fhs=['stdout', 'stderr'])
     lines = p1.handles['stdout'].readlines()
     p1.handles['stdout'].close()
     try:
@@ -583,7 +593,7 @@ class KSPSig(object):
         print line,
       tag = line[0:3]
       if tag == 'pub':
-        hexid = line[12:20] # simply use the last one (may be multiple matches!)
+        hexid = line[12:28] # simply use the last one (may be multiple matches!)
     return hexid
 
 def main():
