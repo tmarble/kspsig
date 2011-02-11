@@ -120,6 +120,27 @@ http://lists.debian.org/debian-devel-announce/2009/05/msg00005.html
 http://www.gag.com/bdale/blog/posts/Strong_Keys.html
 http://www.gnupg.org/faq/weak-digest-algos.html
 
+Bugs
+----
+
+As of v0.5 there is a known bug with the default
+$ kspsig [--incoming] *.asc
+action in that the signature files, while more flexible,
+do not insure that there is only one (1) signature
+(per uid) for your ID (--key=ID).
+
+This is typically not a problem with signature files
+from caff(1) in the form of 
+  0xAAAAAAAAAAAAAAAA.1.signed-by-0xBBBBBBBBBBBBBBBB.asc
+
+Care must be taken, especially if the signature file is
+not named as above, to insure the signature file does
+not contain other signatures that from the sender.
+This could happen if the sender downloaded a key
+with additional signatures and exported all of them.
+The output of `gpg --list-packets *.asc` may be helpful
+to identify the contents of the signature file.
+
 To Do
 -----
 
