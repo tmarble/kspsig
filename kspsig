@@ -19,7 +19,7 @@ class KSPSig(object):
 
   def __init__(self):
     self.program = os.path.basename(sys.argv[0])
-    self.version = '0.5'
+    self.version = '0.6'
     self.description = 'Key Signing Party signature verification tool'
     self.action = 'usage'
     self.options = None
@@ -473,8 +473,9 @@ class KSPSig(object):
 
     % kspsig *.asc
 
-    NOTE: function has been expanded to support alternate forms
-    of signature files (e.g. {myid}__{myemail}.asc or *.asc).
+    NOTE: function has been expanded to support any filename (*.asc)
+    and print out the public key and UID for which the following
+    signatures are made.
     """
     for sigpath in self.args:
       if not os.path.exists(sigpath):
@@ -488,18 +489,34 @@ class KSPSig(object):
         self.gnupg.options.quiet = 1
         self.gnupg.options.armor = 1
         self.gnupg.options.homedir = self.options.gnupghome
-        p1 = self.gnupg.run(['--list-packets', sigpath],
+        p1 = self.gnupg.run(['--with-colons', sigpath],
                             create_fhs=['stdout'])
         lines = p1.handles['stdout'].readlines()
         p1.handles['stdout'].close()
         p1.wait() # process cleanup
+        if len(lines) < 1:
+          return self.error('not a signature file: %s' % sigpath, 7)
+        print sig
+        print '\t' + lines[0][:-1]
+        fields = lines[0].split(':')
+        if len(fields) > 4:
+          myid = fields[4]
+        if not myid:
+          return self.error('not a signature file, pub key not found: %s' % sigpath, 8)
+        if myid != self.options.id:
+          print '\tWarning: signature file not for key: %s' % self.options.id
+        p2 = self.gnupg.run(['--list-packets', sigpath],
+                            create_fhs=['stdout'])
+        lines = p2.handles['stdout'].readlines()
+        p2.handles['stdout'].close()
+        p2.wait() # process cleanup
         uid = -1 # first uid will be 0
         id = ''
         for line in lines:
           fields = line.split()
           if uid >= 0 and len(fields) > 0 and fields[0] == ':public':
-            uid = -2 # special state: discontinue processing
-          elif uid != -2 and len(fields) > 2:
+            break # discontinue processing upon subkeys
+          elif len(fields) > 2:
             if fields[0] == ':user':
               uid += 1
               myidstring = line.split('"')[1]
@@ -509,19 +526,14 @@ class KSPSig(object):
               myidstring = line[len(':attribute packet: '):-1]
             elif fields[0] == ':signature':
               id = fields[5]
-              if myid == None:
-                myid = id
-                if myid != self.options.id:
-                  return self.error('signature file is for %s (not you %s): %s' % (myid, self.options.id, sigpath))
-            elif id != self.options.id and fields[0] == 'digest' and fields[1] == 'algo':
+            elif id != myid and fields[0] == 'digest' and fields[1] == 'algo':
               uidstring = self.get_hex2string(id)
               hashalgo = int(fields[2][:-1])
-              break
-        fmt = '{sig} {algo:<{pad}} {uidstring}'
-        print fmt.format(sig=sig,
-                         algo=self.hashalgo_name(hashalgo),
-                         pad=self.hashalgomax,
-                         uidstring=uidstring)
+              fmt = '\t{algo:<{pad}} {id}  {uidstring}'
+              print fmt.format(algo=self.hashalgo_name(hashalgo),
+                               pad=self.hashalgomax,
+                               id=id[-8:],
+                               uidstring=uidstring)
     return 0
   
   def get_hex2string(self, keyid, getuid = 0):
@@ -535,7 +547,7 @@ class KSPSig(object):
     performed with % gpg --recv-keys ID
     """
 
-    uidstring = '[User ID not found]'
+    uidstring = '[User ID # %d for key: %s not found]' % (getuid + 1, keyid)
     self.gnupg = GnuPGInterface.GnuPG()
     self.gnupg.options.quiet = 1
     self.gnupg.options.armor = 0
@@ -553,8 +565,8 @@ class KSPSig(object):
       keyid = line[13:21]
       # if we have seen a uid then pub or sub means we are done
       if uid > 0 and (tag == 'pub' or tag == 'sub'):
-        uid = -2 # special state: discontinue processing
-      elif uid != -2:
+        break
+      else:
         if tag == 'uid':
           uid += 1
           if uid == getuid:

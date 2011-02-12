@@ -12,6 +12,15 @@ following a key signing party...
 
 This tool only reads keyrings: it does not do any key modifications.
 
+The most common use case is to verify signature strength
+of SHA256 (or greater) prior to importing keys (e.g. here Carla 
+verifies Joe's signature strength, and then imports the sig):
+
+$ kspsig 0x40BFEE868B055D9B.1.signed-by-0x542AA88AAD5896AD.asc
+        pub:u:4096:1:40BFEE868B055D9B:2010-07-26:::u:Carla Coder <carla@coder.net>:
+        SHA256    AD5896AD  Joe Hacker <joe@hacker.net>
+$ gpg --import 0x40BFEE868B055D9B.1.signed-by-0x542AA88AAD5896AD.asc
+
 See the man page for additional documentation and examples
 
 
@@ -30,9 +39,9 @@ system by adding the info9 repository as a source.  The easiest
 way to do this is simply:
 # cp /usr/share/doc/kspsig/info9.net.list /etc/apt/sources.list.d/
 
-Or you can add these lines to /etc/apt/sources.list
-  deb http://info9.net/debian/ unstable/
-  deb-src http://info9.net/debian/ unstable/
+The /etc/apt/sources.list.d/info9.net.list should contain:
+deb http://info9.net/debian/ unstable/
+deb-src http://info9.net/debian/ unstable/
 
 
 Requirements
@@ -79,6 +88,11 @@ $ grep cert-digest-algo ~/.gnupg/gpg.conf ~/.caff/gnupghome/gpg.conf
 /home/USER/.caff/gnupghome/gpg.conf:cert-digest-algo SHA512
 $ 
 
+Note: SHA512 isn't strictly necessary.  In the future
+the GPG default will be SHA256 (see last URL below).
+
+Apparently the default caff(1) behavior is a _feature_:
+http://bugs.debian.org/cgi-bin/bugreport.cgi?bug=527944
 
 Fixing weak signatures
 ----------------------
@@ -119,27 +133,6 @@ http://keyring.debian.org/creating-key.html
 http://lists.debian.org/debian-devel-announce/2009/05/msg00005.html
 http://www.gag.com/bdale/blog/posts/Strong_Keys.html
 http://www.gnupg.org/faq/weak-digest-algos.html
-
-Bugs
-----
-
-As of v0.5 there is a known bug with the default
-$ kspsig [--incoming] *.asc
-action in that the signature files, while more flexible,
-do not insure that there is only one (1) signature
-(per uid) for your ID (--key=ID).
-
-This is typically not a problem with signature files
-from caff(1) in the form of 
-  0xAAAAAAAAAAAAAAAA.1.signed-by-0xBBBBBBBBBBBBBBBB.asc
-
-Care must be taken, especially if the signature file is
-not named as above, to insure the signature file does
-not contain other signatures that from the sender.
-This could happen if the sender downloaded a key
-with additional signatures and exported all of them.
-The output of `gpg --list-packets *.asc` may be helpful
-to identify the contents of the signature file.
 
 To Do
 -----

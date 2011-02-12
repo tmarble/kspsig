@@ -35,6 +35,19 @@ to that directory and run:
 
 $ kspsig *.asc
 
+Sometimes a signature file contains multiple signatures.  The
+default incoming action will show you, on the first line the 
+key which is signed (usually this is your ID).  Subsequent lines
+show the strengh of each signature for that key. Multiple signatures
+could be the result of someone signing your key that has multiple
+keys (e.g. older one and a newer one):
+
+$ kspsig 0x40BFEE868B055D9B.1.signed-by-0x542AA88AAD5896AD.asc
+        pub:u:4096:1:40BFEE868B055D9B:2010-07-26:::u:Carla Coder <carla@coder.net>:
+        SHA256    AD5896AD  Joe Hacker <joe@hacker.net>
+        SHA256    7D806443  Joe Hacker <joe@hacker.net>
+$ 
+Note that typically caff(1) prunes extra signatures. 
 
 How strongly did I sign other's keys? I just learned about
 .B kspsig\fR and I want to see what strength I used to sign
@@ -63,7 +76,7 @@ I wonder how Alice signed Bob's key?  I can find out with by
 using my real keyring as the signing keyring (note that with --verbose
 the hex id's guessed for the names are shown):
 
-$ kspsig -v -c ~/.gnupg -k alice@restaurant.info -o bob
+$ kspsig -v -g ~/.gnupg -k alice@restaurant.info -o bob
 
 [NOTES]
 While ID or YOURID are typically expressed as hex strings, they may
@@ -113,3 +126,5 @@ http://keyring.debian.org/creating-key.html
 http://lists.debian.org/debian-devel-announce/2009/05/msg00005.html
 .br
 http://www.gag.com/bdale/blog/posts/Strong_Keys.html
+.br
+http://www.gnupg.org/faq/weak-digest-algos.html

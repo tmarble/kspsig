@@ -1,3 +1,10 @@
+kspsig (0.6) unstable; urgency=low
+
+  * Fixed 'bug' with --incoming. Now all signatures in *.asc are shown
+  * Updated documentation with additional pointers
+
+ -- Tom Marble <tmarble@info9.net>  Sat, 12 Feb 2011 16:22:54 -0600
+
 kspsig (0.5) unstable; urgency=low
 
   * Support alternate formats of *.asc files (ignore filename)
