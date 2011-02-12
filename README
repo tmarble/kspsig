@@ -94,6 +94,22 @@ the GPG default will be SHA256 (see last URL below).
 Apparently the default caff(1) behavior is a _feature_
 (see link to bug #527944 below).
 
+It may be wise to review photo UID's before signing
+with caff(1) by using this little wrapper function (you can
+define it in your ~/.bashrc and don't forget to install xloadimage
+or some other gpg --photo-viewer):
+
+function tcaff() { 
+  echo "=== show photo UIDs ==="
+  if ! gpg --list-options show-photos --list-keys $1 ; then
+    gpg --recv-key $1
+    gpg --list-options show-photos --list-keys $1 
+  fi
+  echo "=== sign key $1 ==="
+  caff $1
+}
+
+
 Fixing weak signatures
 ----------------------
 
