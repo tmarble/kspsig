@@ -91,8 +91,8 @@ $
 Note: SHA512 isn't strictly necessary.  In the future
 the GPG default will be SHA256 (see last URL below).
 
-Apparently the default caff(1) behavior is a _feature_:
-http://bugs.debian.org/cgi-bin/bugreport.cgi?bug=527944
+Apparently the default caff(1) behavior is a _feature_
+(see link to bug #527944 below).
 
 Fixing weak signatures
 ----------------------
@@ -129,10 +129,11 @@ See Also
 gpg(1)
 caff(1)
 http://www.debian-administration.org/users/dkg/weblog/48
+http://www.gnupg.org/faq/weak-digest-algos.html
 http://keyring.debian.org/creating-key.html
 http://lists.debian.org/debian-devel-announce/2009/05/msg00005.html
+http://bugs.debian.org/cgi-bin/bugreport.cgi?bug=527944
 http://www.gag.com/bdale/blog/posts/Strong_Keys.html
-http://www.gnupg.org/faq/weak-digest-algos.html
 
 To Do
 -----
@@ -140,5 +141,4 @@ To Do
 - Peer review of the approach of using gpg --export and 
   gpg --list-packets
 - Consider rewriting with direct access to the keyrings
-
 
