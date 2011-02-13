@@ -138,6 +138,38 @@ you may be asked to re-sign some keys.  Here is an approach:
 4. If the new signature doesn't use the algorithm you intended
    then try to reconfigure caff and goto step 1.
 
+Sample Letter
+-------------
+
+To: Joe Hacker <joe@hacker.net>
+Subject: Resign with stronger signature? [was Re: Your signed PGP key ...]
+
+Thank you for signing my key at KEY SIGNING PARTY.
+
+I noticed that you signed it with the weaker SHA1 algorithm [0].  
+I used kspsig to verify this [1]:
+
+$ kspsig 0x40BFEE868B055D9B.1.signed-by-0x542AA88AAD5896AD.asc
+        pub:u:4096:1:40BFEE868B055D9B:2010-07-26:::u:Carla Coder <carla@coder.net>:
+        SHA1      AD5896AD  Joe Hacker <joe@hacker.net>
+$
+
+I have not imported nor uploaded this signature yet.  Would
+you please consider reconfiguring gpg [2] and caff and signing it again?
+
+Just add "cert-digest-algo  SHA512" to ~/.gnupg/gpg.conf and then
+insure caff uses your default GnuPG config file as follows:
+% mv ~/.caff/gnupghome/gpg.conf ~/.caff/gnupghome/gpg.conf.old
+% ln -s ~/.gnupg/gpg.conf ~/.caff/gnupghome/gpg.conf
+
+Please let me know if you have any questions,
+
+--Carla Coder
+
+[0] http://www.gnupg.org/faq/weak-digest-algos.html
+[1] http://github.com/tmarble/kspsig
+[2] http://www.debian-administration.org/users/dkg/weblog/48
+
 
 See Also
 --------
