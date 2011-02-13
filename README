@@ -49,6 +49,8 @@ Requirements
 
 Depends on python 2.6 and python-gnupginterface (and thus gpg).
 Although not strictly required it is assumed that caff is also installed.
+It may work on later versions of python 2.x, but it is not
+tested with python 3.
 
 The man page can be regenerated using help2man with:
 $ help2man --output kspsig.1 --include=kspsig.h2m kspsig
