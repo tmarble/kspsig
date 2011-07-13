@@ -19,7 +19,7 @@ class KSPSig(object):
 
   def __init__(self):
     self.program = os.path.basename(sys.argv[0])
-    self.version = '0.6'
+    self.version = '0.7'
     self.description = 'Key Signing Party signature verification tool'
     self.action = 'usage'
     self.options = None
@@ -354,6 +354,7 @@ class KSPSig(object):
       return self.error('unable to export key from caff keyring (did you sign it yet?): %s' % principal, 8)
     uid = -1 # first uid will be 0
     sub = -1 # first sub will be 0
+    n = -1 # first signature number for first uid will be 0
     for line in lines:
       fields = line.split()
       # if we have seen a uid then pub or sub means we are done
@@ -393,6 +394,7 @@ class KSPSig(object):
     p3.wait() # process cleanup
     uid = -1 # first uid will be 0
     sub = -1 # first sub will be 0
+    n = -1 # first signature number for first uid will be 0
     hashalgo = 'hashalgo' # print title for this column
     for line in lines:
       tag = line[0:3]
