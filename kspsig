@@ -354,7 +354,6 @@ class KSPSig(object):
       return self.error('unable to export key from caff keyring (did you sign it yet?): %s' % principal, 8)
     uid = -1 # first uid will be 0
     sub = -1 # first sub will be 0
-    n = -1 # first signature number for first uid will be 0
     for line in lines:
       fields = line.split()
       # if we have seen a uid then pub or sub means we are done
@@ -376,11 +375,17 @@ class KSPSig(object):
           uidstring = line[len(':attribute packet: '):-1]
           n = -1 # first signature number for this uid will be 0
         elif fields[0] == ':signature':
-          n += 1 # signature number for this uid
-          keyid = fields[5]
+          if uid >= 0:
+            n += 1 # signature number for this uid
+            keyid = fields[5]
+          # else these are probably revocation signatures before
+          # the first UID.. We will ignore them
         elif fields[0] == 'digest' and fields[1] == 'algo':
-          hashalgo = int(fields[2][:-1])
-          self.set_hashalgo(uidstring, n, keyid, hashalgo)
+          if uid >= 0:
+            hashalgo = int(fields[2][:-1])
+            self.set_hashalgo(uidstring, n, keyid, hashalgo)
+          # else these are probably revocation signatures before
+          # the first UID.. We will ignore them
     temp.close()
     os.unlink(temp.name)
     if self.options.debug > 1:
@@ -394,7 +399,6 @@ class KSPSig(object):
     p3.wait() # process cleanup
     uid = -1 # first uid will be 0
     sub = -1 # first sub will be 0
-    n = -1 # first signature number for first uid will be 0
     hashalgo = 'hashalgo' # print title for this column
     for line in lines:
       tag = line[0:3]
