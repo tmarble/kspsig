@@ -1,12 +1,13 @@
 kspsig (0.7) unstable; urgency=low
 
   * Minor documentation improvements
+  * Fixed signature counter when revokations occur early in the keyring
 
   [Mark Wielaard]
   
   * Set shebang to just #!/usr/bin/python
   
- --
+ -- Tom Marble <tmarble@info9.net>  Wed, 27 Jul 2011 05:17:54 -0500
 
 kspsig (0.6) unstable; urgency=low
 
