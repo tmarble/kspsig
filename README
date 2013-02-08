@@ -3,8 +3,8 @@ kspsig
 
 Key Signing Party signature verification tool
 
-If  you  are  concerned  about  the  hash algorithm strength used 
-in key signing this tool seeks to answer questions you may have 
+If  you  are  concerned  about  the  hash algorithm strength used
+in key signing this tool seeks to answer questions you may have
 following a key signing party...
 - How strongly did others sign my key?
 - How strongly did I sign other's keys?
@@ -13,7 +13,7 @@ following a key signing party...
 This tool only reads keyrings: it does not do any key modifications.
 
 The most common use case is to verify signature strength
-of SHA256 (or greater) prior to importing keys (e.g. here Carla 
+of SHA256 (or greater) prior to importing keys (e.g. here Carla
 verifies Joe's signature strength, and then imports the sig):
 
 $ kspsig 0x40BFEE868B055D9B.1.signed-by-0x542AA88AAD5896AD.asc
@@ -88,7 +88,7 @@ You can verify the caff signature preference with:
 $ grep cert-digest-algo ~/.gnupg/gpg.conf ~/.caff/gnupghome/gpg.conf
 /home/USER/.gnupg/gpg.conf:cert-digest-algo SHA512
 /home/USER/.caff/gnupghome/gpg.conf:cert-digest-algo SHA512
-$ 
+$
 
 Note: SHA512 isn't strictly necessary.  In the future
 the GPG default will be SHA256 (see last URL below).
@@ -101,11 +101,11 @@ with caff(1) by using this little wrapper function (you can
 define it in your ~/.bashrc and don't forget to install xloadimage
 or some other gpg --photo-viewer):
 
-function tcaff() { 
+function tcaff() {
   echo "=== show photo UIDs ==="
   if ! gpg --list-options show-photos --list-keys $1 ; then
     gpg --recv-key $1
-    gpg --list-options show-photos --list-keys $1 
+    gpg --list-options show-photos --list-keys $1
   fi
   echo "=== sign key $1 ==="
   caff $1
@@ -148,7 +148,7 @@ Subject: Resign with stronger signature? [was Re: Your signed PGP key ...]
 
 Thank you for signing my key at KEY SIGNING PARTY.
 
-I noticed that you signed it with the weaker SHA1 algorithm [0].  
+I noticed that you signed it with the weaker SHA1 algorithm [0].
 I used kspsig to verify this [1]:
 
 $ kspsig 0x40BFEE868B055D9B.1.signed-by-0x542AA88AAD5896AD.asc
@@ -168,7 +168,7 @@ Please let me know if you have any questions,
 
 --Carla Coder
 
-[0] http://www.gnupg.org/faq/weak-digest-algos.html
+[0] http://www.gnupg.org/faq/weak-digest-algos.en.html
 [1] http://github.com/tmarble/kspsig
 [2] http://www.debian-administration.org/users/dkg/weblog/48
 
@@ -179,7 +179,7 @@ See Also
 gpg(1)
 caff(1)
 http://www.debian-administration.org/users/dkg/weblog/48
-http://www.gnupg.org/faq/weak-digest-algos.html
+http://www.gnupg.org/faq/weak-digest-algos.en.html
 http://keyring.debian.org/creating-key.html
 http://lists.debian.org/debian-devel-announce/2009/05/msg00005.html
 http://bugs.debian.org/cgi-bin/bugreport.cgi?bug=527944
@@ -188,7 +188,6 @@ http://www.gag.com/bdale/blog/posts/Strong_Keys.html
 To Do
 -----
 
-- Peer review of the approach of using gpg --export and 
+- Peer review of the approach of using gpg --export and
   gpg --list-packets
 - Consider rewriting with direct access to the keyrings
-
