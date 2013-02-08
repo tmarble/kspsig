@@ -43,6 +43,11 @@ The /etc/apt/sources.list.d/info9.net.list should contain:
 deb http://info9.net/debian/ unstable/
 deb-src http://info9.net/debian/ unstable/
 
+To avoid APT warnings about unverifyable packages or if you trust me
+then you can add my key to your APT key ring:
+% gpg --recv-key 0x40BFEE868B055D9A
+% gpg --armor --export 0x40BFEE868B055D9A | sudo apt-key add -
+
 
 Requirements
 ------------
