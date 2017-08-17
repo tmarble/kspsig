@@ -1,32 +1,98 @@
-#!/usr/bin/python
+#!/usr/bin/python3
 # -*- Mode: python; py-indent-offset: 2; coding: utf-8  -*-
 # kspsig
-# 
-# Copyright (c) 2010 Tom Marble
+#
+# Copyright (c) 2017 Tom Marble
 # Licensed under GPLv3 or later  http://www.gnu.org/licenses/gpl-3.0.txt
-# 
+#
 # Key Signing Party signature verification tool
 # http://github.com/tmarble/kspsig
 
-import os, os.path, sys
-import GnuPGInterface, tempfile
-from optparse import OptionParser
+import os
+import os.path
+import sys
+import textwrap
+import argparse
+import time
 
-class KSPSig(object):
+# Field 2 validity
+# https://sources.debian.net/src/gnupg2/2.1.23-1/doc/DETAILS/
+def validity(v):
+  validity_string = 'unknown'
+  if v == 'i' or v == 'n':
+    validity_string = 'invalid'
+  elif v == 'd':
+    validity_string = 'disabled'
+  elif v == 'd':
+    validity_string = 'disabled'
+  elif v == 'r':
+    validity_string = 'revoked'
+  elif v == 'e':
+    validity_string = 'expired'
+  elif v == 'm':
+    validity_string = 'marginal'
+  elif v == 'f':
+    validity_string = 'full'
+  elif v == 'u':
+    validity_string = 'ultimate'
+  elif v == 's':
+    validity_string = 'disabled'
+  elif v == 'd':
+    validity_string = 'special'
+  validity_string = '[' + validity_string + ']'
+  return validity_string
+
+# Field 6 to date string
+# https://sources.debian.net/src/gnupg2/2.1.23-1/doc/DETAILS/
+def timestamp_to_date(timestamp):
+  if timestamp.find('T') > 0: # ISO 8601
+    utc = time.strptime(timestamp, '%Y%m%dT%H%M%S')
+  else:
+    utc = time.gmtime(int(timestamp))
+  date_string = time.strftime('%Y-%m-%d', utc)
+  return date_string
+
+def expires_to_date(timestamp):
+  if len(timestamp) == 0:
+    return '' # does not expire
+  return '[expires: %s]' % timestamp_to_date(timestamp)
+
+# Field 11 signature_class
+# https://sources.debian.net/src/gnupg2/2.1.23-1/doc/DETAILS/
+def signature_class(c):
+  if len(c) == 3 and c != '10x':
+    return c[1]
+  return ' '
+
+# Field 12 capability
+# https://sources.debian.net/src/gnupg2/2.1.23-1/doc/DETAILS/
+def capability(cap):
+  cap_string = '['
+  for c in cap:
+    if c.islower():
+      cap_string += c.upper()
+  cap_string += ']'
+  return cap_string
+
+
+class KSPSig:
   """
   Key Signing Party signature verification tool
   """
+  VERSION = '0.9.0'
 
-  def __init__(self):
-    self.program = os.path.basename(sys.argv[0])
-    self.version = '0.7'
-    self.description = 'Key Signing Party signature verification tool'
-    self.action = 'usage'
-    self.options = None
-    self.args = None
-    self.parser = None
-    self.idstring = None # corresponds to self.options.id
-    # from http://tools.ietf.org/html/rfc4880#section-9.4
+  def __init__(self, args):
+    self.args = args
+    (self.args.key, self.key_string) = self.get_key(self.args.key, True)
+    if self.args.outgoing:
+      (self.args.outgoing, self.outgoing_string) = self.get_key(self.args.outgoing)
+    if self.args.verbose:
+      print('key:      %s = %s' % (self.args.key, self.key_string))
+      if self.args.outgoing:
+        print('outgoing: %s = %s' % (self.args.outgoing, self.outgoing_string))
+    # For hashalsos definitions see...
+    # https://tools.ietf.org/html/draft-ietf-openpgp-rfc4880bis-02#section-9.5
+    # see also http://tools.ietf.org/html/rfc4880#section-9.4
     self.hashalgos = {
       1: "MD5",
       2: "SHA1",
@@ -34,518 +100,73 @@ class KSPSig(object):
       8: "SHA256",
       9: "SHA384",
       10: "SHA512",
-      11: "SHA224"
-      }
+      11: "SHA224",
+      12: "SHA3-256",
+      14: "SHA3-512"}
     # max hash algorithm name length (does not consider Unknown or Reserved)
-    self.hashalgomax = max([len(x) for x in self.hashalgos.values()])
-
-  def parse_args(self, args = None):
-    """
-    Parse command line arguments and do some preliminary checking.
-    Define the *action* to take when do_action() is called
-    """
-
-    usage = 'usage: %prog [OPTION] [--incoming] *.asc'
-    usage += '\n   or: %prog [OPTION] --outgoing YOURID'
-    usage += '\n   or: %prog [OPTION] --signatures'
-    self.parser = OptionParser(version='%prog ' + str(self.version),
-                               description=self.description,
-                               usage=usage)
-    self.parser.remove_option('-h')
-    self.parser.add_option('-i', '--incoming',
-                           help='check incoming signature file(s) (default action)',
-                           action='store_true', dest='incoming')
-    self.parser.add_option('-o', '--outgoing',
-                           help='check outgoing signature(s) for YOURID',
-                           dest='yourid')
-    self.parser.add_option('-s', '--signatures',
-                           help='check signatures for ID',
-                           action='store_true', dest='signatures')
-    self.parser.add_option('-k', '--key',
-                           help='signing ID to check [gpg default-key]',
-                           dest='id')
-    self.parser.add_option('-g', '--gnupghome',
-                           help='GnuPG home directory [$HOME/.gnupg]',
-                           dest='gnupghome')
-    self.parser.add_option('-c', '--caffhome',
-                           help='caff GnuPG home directory [$HOME/.caff/gnupghome]',
-                           dest='caffhome')
-    self.parser.add_option('-h', '--help',
-                           help='print usage information',
-                           action='store_true', dest='help')
-    self.parser.add_option('-v', '--verbose',
-                           help='verbose mode',
-                           action='store_true', dest='verbose')
-    self.parser.add_option('-d', '--debug',
-                           help='debug level (may be used multiple times)',
-                           action='count', 
-                           dest='debug',
-                           default=0)
-
-    self.options, self.args = self.parser.parse_args(args)
- 
-
-    if not self.options.help:
-      if self.options.signatures and not (self.options.yourid or 
-                                          self.options.incoming or
-                                          len(self.args) > 0):
-        self.action = 'signatures'
-      elif self.options.yourid and not (self.options.signatures or 
-                                        self.options.incoming or
-                                        len(self.args) > 0):
-        self.action = 'outgoing'
-        if not self.is_hex(self.options.yourid):
-          hexid = self.get_string2hex(self.options.yourid)
-          if hexid:
-            self.options.yourid = hexid
-          else:
-            self.error('YOURID is not found in the keyring: %s' % self.options.yourid)
-            self.action = 'usage'
-      elif not (self.options.signatures or 
-                self.options.yourid or
-                len(self.args) == 0):
-        self.action = 'incoming'
-      if not self.options.gnupghome:
-        self.options.gnupghome = '~/.gnupg'
-      if not self.options.caffhome:
-        self.options.caffhome = '~/.caff/gnupghome'
-      if not self.options.id:
-        self.get_id()
-      if self.is_hex(self.options.id):
-        # insure that we have a full 16 digit hex key
-        self.options.id = self.get_string2hex(self.options.id)
-        self.idstring = self.get_hex2string(self.options.id)
-      else:
-        self.idstring = self.options.id
-        # insure that we have a full 16 digit hex key
-        hexid = self.get_string2hex(self.options.id)
-        if hexid:
-          self.options.id = hexid
-        else:
-          self.error('ID is not found in the keyring: %s' % self.options.id)
-          self.action = 'usage'
-      if self.options.verbose:
-        if self.idstring:
-          print 'ID = %s = %s' % (self.options.id, self.idstring)
-        else:
-          print 'ID = %s' % self.options.id
-        print 'GNUPGHOME = %s' % self.options.gnupghome
-        print 'CAFFHOME = %s' % self.options.caffhome
-      if self.options.debug:
-        print 'debug = %d' % self.options.debug
-    return 0
-
-  def do_action(self):
-    return getattr(self, self.action)()
-
-  def usage(self):
-    if not self.parser:
-      self.parse_args()
-    self.parser.print_help()
-    return 1
-
-  def error(self, msg = 'unknown error', rv = 255):
-    sys.stderr.write(self.program + ': ' + msg + '\n')
-    return rv
-
-  def is_hex(self, id):
-    """
-    Return True if id is at least 8 characters long and is
-    valid hexadecimal.
-    """
-    ishex = False
-    if len(id) >= 8:
-      try:
-        h = int(id, 16)
-        ishex = True
-      except ValueError:
-        pass
-    return ishex
-
-  def get_id(self):
-    """
-    Get the users default-key, via
-    1. from gpg.conf (if present)
-    2. first secret key
-    """
-    gpgconf = os.path.expanduser(self.options.gnupghome + '/gpg.conf')
-    if os.path.exists(gpgconf):
-      for line in file(gpgconf):
-        fields = line.split()
-        if len(fields) > 1 and fields[0] == 'default-key':
-          self.options.id = ' '.join(fields[1:])
-          break
-    if not self.options.id:
-      # get the first secret key
-      self.gnupg = GnuPGInterface.GnuPG()
-      self.gnupg.options.quiet = 1
-      self.gnupg.options.armor = 0
-      self.gnupg.options.homedir = self.options.gnupghome
-      self.gnupg.options.extra_args.append('--with-colons')
-      proc = self.gnupg.run(['--list-secret-keys'], create_fhs=['stdout'])
-      line = proc.handles['stdout'].readline()
-      proc.handles['stdout'].close()
-      proc.wait() # process cleanup
-      fields = line.split(':')
-      if len(fields) < 10:
-        return self.error('unable to list secret keys', 3)
-      self.options.id = fields[4][8:16]
-      self.idstring = fields[9]
-    return 0
+    self.hashalgo_max = max([len(x) for x in self.hashalgos.values()])
+    self.pubalgos = { # Public-Key Algorithms
+      1: "RSA",
+      2: "RSA [E]", # encrypt only
+      3: "RSA [S]", # sign only
+      16: "Elgamal",
+      17: "DSA",
+      18: "ECDH",
+      19: "ECDSA",
+      22: "EdDSA"}
+    # max public key algorithm name length
+    self.pubalgo_max = max([len(x) for x in self.pubalgos.values()])
+    self.list_sigs_handlers = { # record handlers in list_sigs
+      'pub': self.list_sigs_pub,
+      'fpr': self.list_sigs_fpr,
+      'uid': self.list_sigs_uid,
+      'sig': self.list_sigs_sig,
+      'unk': self.list_sigs_unk}
 
   def hashalgo_name(self, hashalgo):
     """
     Return the name of the hash algorithm given the number (from RFC 4880)
-    If the hashalgo == 0 it is probably because we didn't find 
+    If the hashalgo == 0 it is probably because we didn't find
     what it's value should be (thus return 'Unknown').
     All other values which are not in the lookup table are assumed
     to be 'Reserved'
     """
+    hashalgo = int(hashalgo) # coerce to int
     if hashalgo == 0:
       name = 'Unknown'
-    elif self.hashalgos.has_key(hashalgo):
+    elif hashalgo in self.hashalgos:
       name = self.hashalgos[hashalgo]
     else:
       name = 'Reserved'
     return name
 
-  def get_uid(self, uidstring, add = False):
+  def pubalgo_name(self, pubalgo):
     """
-    Internal helper for managing key signature hash algorithms
-    Get the uid number given the uidstring
+    Return the name of the public key algorithm given the number (from RFC 4880)
+    If the pubalgo == 0 it is probably because we didn't find
+    what it's value should be (thus return 'Unknown').
+    All other values which are not in the lookup table are assumed
+    to be 'Reserved'
     """
-    uid = -1
-    for i in range(len(self.uidstrings)):
-      if self.uidstrings[i] == uidstring:
-        uid = i
-        break
-    if uid < 0 and add:
-      uid = len(self.uidstrings)
-      self.uidstrings.append(uidstring)
-    return uid
+    pubalgo = int(pubalgo) # coerce to int
+    if pubalgo == 0:
+      name = 'Unknown'
+    elif pubalgo >= 100 and pubalgo <= 110:
+      name = 'Private'
+    elif pubalgo in self.pubalgos:
+      name = self.pubalgos[pubalgo]
+    else:
+      name = 'Reserved'
+    return name
 
-  def utf8unescape(self, str):
-    ustr = ''
-    i = 0
-    n = len(str)
-    while i < n:
-      if str[i] == '\\' and i + 4 < n and str[i + 1] == 'x':
-        # assume str[i + 2:i + 3] is hex
-        ustr += chr(int(str[i + 2:i + 4], 16))
-        i += 4
-      else:
-        ustr += str[i]
-        i += 1
-    return ustr
+  def error(self, msg = 'unknown error', rv = 255):
+    sys.stderr.write(self.args.program + ': ' + msg + '\n')
+    return rv
 
-  def utf8escape(self, ustr):
-    str = ''
-    for c in ustr:
-      v = ord(c)
-      if v < 128:
-        str += c
-      else:
-        str += '\\x%x' % v
-    return str
-
-  def set_hashalgo(self, uidstring, n, keyid, hashalgo):
-    """
-    Internal helper for managing key signature hash algorithms
-    Save the hash algorithm for the given uid and signature
-    """
-    keyid = keyid[-8:] # use only last 8 hex digits
-    # convert escaped utf-8 L\xc3\xb3pez to unicode López
-    # uidstring = uidstring.decode('utf-8', 'ignore') # handle i18n characters
-    uidstring = self.utf8unescape(uidstring)
-    if self.options.debug:
-      print 'SET %s, %d: [%s, %d]' % (self.utf8escape(uidstring), n, keyid, hashalgo) #debug
-    uid = self.get_uid(uidstring, True)
-    # get the list for this uid, create empty lists as necessary
-    while len(self.sigs) <= uid:
-      self.sigs.append([])
-    uidlist = self.sigs[uid]
-    # get the keyhash for this uid, create empty keyhash's as necessary
-    while len(uidlist) <= n:
-      uidlist.append([])
-    uidlist[n] = [keyid, hashalgo]
-    self.sigs[uid] = uidlist
-
-  def get_hashalgo(self, uidstring, n, keyid):
-    """
-    Internal helper for managing key signature hash algorithms
-    Get the hash algorithm for the given uid and signature (return number)
-    """
-    hashalgo = 0
-    keyid = keyid[-8:] # use only last 8 hex digits
-    # uidstring = uidstring.decode('utf-8', 'ignore') # handle i18n characters
-    uidstring = self.utf8unescape(uidstring)
-    if self.options.debug:
-      print 'GET %s, %d: [%s, ...]' % (self.utf8escape(uidstring), n, keyid) #debug
-    uid = self.get_uid(uidstring)
-    if uid >= 0 and len(self.sigs) > uid:
-      uidlist = self.sigs[uid]
-      if len(uidlist) > n:
-        keyhash = uidlist[n]
-        # confirm that the keyid we are looking for matches
-        if len(keyhash) == 2 and keyhash[0] == keyid:
-          hashalgo = keyhash[1]
-    return hashalgo
-
-  def get_hashalgo_name(self, uidstring, n, keyid):
-    """
-    Internal helper for managing key signature hash algorithms
-    Get the hash algorithm for the given uid and signature (return name)
-    """
-    return self.hashalgo_name(self.get_hashalgo(uidstring, n, keyid))
-
-  def debug_sigs(self):
-    """
-    Internal helper for managing key signature hash algorithms
-    Print out the data structure by uid then signature
-    """
-    print 'DEBUG SIGS =========================='
-    for uid in range(len(self.sigs)):
-      print 'uid = %d = %s' % (uid, self.uidstrings[uid])
-      uidlist = self.sigs[uid]
-      for n in range(len(uidlist)):
-        keyhash = uidlist[n]
-        if len(keyhash) == 2:
-          print '  n = %d = [%s, %d]' % (n, keyhash[0], keyhash[1])
-        else:
-          print '  n = %d = [ERROR]' % n
-    print 'DEBUG SIGS =========================='
-
-  def get_sigs(self, homedir, principal, signatory = None):
-    """
-    Common function for signatures() and outgoing() to export
-    the key for a principal and analyze the hash algorithm
-    of the signers (or just one signatory)
-    """
-    principal = principal[-8:] # use only last 8 hex digits
-    if signatory:
-      signatory = signatory[-8:] # use only last 8 hex digits
-    self.uidstrings = [] # uidstrings[uid] = uidstring for uid
-    self.sigs = [] # nested lists by uid, by n of [keyid, hashalgo]
-    temp = tempfile.NamedTemporaryFile(delete=False)
-    # first two gpg invokations are to gather the hashalgo's
-    # NOTE --export will include revoked keys!
-    # gpg --armor --export principal > temp
-    # debug: for some reason we need a pristine gnupg object here
-    self.gnupg = GnuPGInterface.GnuPG()
-    self.gnupg.options.quiet = 1
-    self.gnupg.options.armor = 1
-    self.gnupg.options.homedir = homedir
-    p1 = self.gnupg.run(['--export', principal], 
-                        attach_fhs={'stdout': temp})
-    # p1.handles['stdout'].close() # temp would get closed!
-    p1.wait() # process cleanup
-    # debug: verify temp.name is not empty
-    # gpg --list-packets < temp
-    temp.seek(0)
-    self.gnupg.options.armor = 0
-    p2 = self.gnupg.run(['--list-packets'], 
-                        create_fhs=['stdout'],
-                        attach_fhs={'stdin': temp})
-    lines = p2.handles['stdout'].readlines()
-    p2.handles['stdout'].close()
-    try:
-      p2.wait() # process cleanup
-    except IOError:
-      return self.error('unable to export key from caff keyring (did you sign it yet?): %s' % principal, 8)
-    uid = -1 # first uid will be 0
-    sub = -1 # first sub will be 0
-    for line in lines:
-      fields = line.split()
-      # if we have seen a uid then pub or sub means we are done
-      hashalgo = 0
-      if len(fields) > 2:
-        if fields[0] == ':user':
-          uid += 1
-          uidstring = line.split('"')[1]
-          n = -1 # first signature number for this uid will be 0
-        elif uid >= 0 and fields[0] == ':public':
-          # treat :public sub key packet: as another uid in the data structure
-          uid += 1
-          sub += 1
-          uidstring = '[subkey %d]' % sub
-          n = -1 # first signature number for this uid will be 0
-        elif fields[0] == ':attribute':
-          # NOTE: :attribute is used for a JPEG uid
-          uid += 1 # (starts at 1)
-          uidstring = line[len(':attribute packet: '):-1]
-          n = -1 # first signature number for this uid will be 0
-        elif fields[0] == ':signature':
-          if uid >= 0:
-            n += 1 # signature number for this uid
-            keyid = fields[5]
-          # else these are probably revocation signatures before
-          # the first UID.. We will ignore them
-        elif fields[0] == 'digest' and fields[1] == 'algo':
-          if uid >= 0:
-            hashalgo = int(fields[2][:-1])
-            self.set_hashalgo(uidstring, n, keyid, hashalgo)
-          # else these are probably revocation signatures before
-          # the first UID.. We will ignore them
-    temp.close()
-    os.unlink(temp.name)
-    if self.options.debug > 1:
-      self.debug_sigs()
-    # NOTE: --check-sigs doesn't list which ID for which the key is missing
-    # gpg --list-sigs principal
-    p3 = self.gnupg.run(['--list-sigs', principal]
-                        , create_fhs=['stdout'])
-    lines = p3.handles['stdout'].readlines()
-    p3.handles['stdout'].close()
-    p3.wait() # process cleanup
-    uid = -1 # first uid will be 0
-    sub = -1 # first sub will be 0
-    hashalgo = 'hashalgo' # print title for this column
-    for line in lines:
-      tag = line[0:3]
-      keyid = line[13:21]
-      # if we have seen a uid then pub or sub means we are done
-      if tag == 'uid':
-        uid += 1
-        uidstring = line[3:].strip()
-        n = -1 # first signature number for this uid will be 0
-      elif tag == 'sub':
-        # treat sub key as another uid in the data structure
-        uid += 1
-        sub += 1
-        uidstring = '[subkey %d]' % sub
-        n = -1 # first signature number for this subkey will be 0
-      elif tag == 'sig' or tag == 'rev':
-        n += 1
-        # find the hashalgo for the nth sig on uid (or sub)
-        hashalgo = self.get_hashalgo_name(uidstring, n, keyid)
-      if not signatory or tag != 'sig' or keyid == signatory:
-        fmt = '{algo:<{pad}} {line}'
-        print fmt.format(algo=hashalgo,
-                         pad=self.hashalgomax,
-                         line=line[:-1])
-      hashalgo = ''
-    return 0
-    
-  def signatures(self):
-    """
-    Print hash algorithm for signatures for the ID
-    """
-    if self.options.verbose:
-      str = 'Checking signatures for ' + self.options.id
-      if self.idstring:
-        str += ' = ' + self.idstring
-      print str
-    return self.get_sigs(self.options.gnupghome, self.options.id)
-
-  def outgoing(self):
-    """
-    This function is indended to help users understand what
-    hash algorithm has been used to sign other people's keys
-    after a Key Signing Party when they have used caff.
-
-    It certainly may be possible to inspect the output
-    of self.options.caffhome + '/keys' but this implementation
-    will use the caff separate public ring:
-    self.options.caffhome + '/gnupghome/pubring.gpg'.
-
-    This function uses the CAFFHOME keyring as that is the typical
-    place where outgoing signatures are stored.  Of course CAFFHOME
-    can be overidden as a command line argument to inspect (more
-    generally) how ID signed YOURID (set --caffhome to ~/.gnupg )
-    """
-    if self.options.verbose:
-      print 'Outgoing signatures of %s by %s' % (self.options.yourid, 
-                                                 self.options.id)
-    pubring = os.path.expanduser(self.options.caffhome + '/pubring.gpg')
-    if not os.path.exists(pubring):
-      return self.error('caff public keyring not found: %s' % pubring, 4)
-    return self.get_sigs(self.options.caffhome, 
-                         self.options.yourid, self.options.id)
-
-  def incoming(self):
-    """
-    Function to display the hash algorithm used by signatures sent
-    to you by others at a Key Signing Party.  Typically caff sends
-    out an e-mail with an attachment of the form:
-
-    0x1111222233334444.1.signed-by-0x5555666677778888.asc
-
-    Where the first hex string is the users ID (followed by the uid),
-    the second hex string is the signatory ID.
-
-    If the user stores all of these (as yet unimported) signatures
-    in a given directory then (since this is the default action) this 
-    program can be run as simply as:
-
-    % kspsig *.asc
-
-    NOTE: function has been expanded to support any filename (*.asc)
-    and print out the public key and UID for which the following
-    signatures are made.
-    """
-    for sigpath in self.args:
-      if not os.path.exists(sigpath):
-        return self.error('cannot open: %s' % sigpath, 6)
-      else:
-        sig = os.path.basename(sigpath)
-        myid = None
-        uidstring = None
-        hashalgo = 0
-        self.gnupg = GnuPGInterface.GnuPG()
-        self.gnupg.options.quiet = 1
-        self.gnupg.options.armor = 1
-        self.gnupg.options.homedir = self.options.gnupghome
-        p1 = self.gnupg.run(['--with-colons', sigpath],
-                            create_fhs=['stdout'])
-        lines = p1.handles['stdout'].readlines()
-        p1.handles['stdout'].close()
-        p1.wait() # process cleanup
-        if len(lines) < 1:
-          return self.error('not a signature file: %s' % sigpath, 7)
-        print sig
-        print '\t' + lines[0][:-1]
-        fields = lines[0].split(':')
-        if len(fields) > 4:
-          myid = fields[4]
-        if not myid:
-          return self.error('not a signature file, pub key not found: %s' % sigpath, 8)
-        if myid != self.options.id:
-          print '\tWarning: signature file not for key: %s' % self.options.id
-        p2 = self.gnupg.run(['--list-packets', sigpath],
-                            create_fhs=['stdout'])
-        lines = p2.handles['stdout'].readlines()
-        p2.handles['stdout'].close()
-        p2.wait() # process cleanup
-        uid = -1 # first uid will be 0
-        id = ''
-        for line in lines:
-          fields = line.split()
-          if uid >= 0 and len(fields) > 0 and fields[0] == ':public':
-            break # discontinue processing upon subkeys
-          elif len(fields) > 2:
-            if fields[0] == ':user':
-              uid += 1
-              myidstring = line.split('"')[1]
-            elif fields[0] == ':attribute':
-              # NOTE: :attribute is used for a JPEG uid
-              uid += 1 # (starts at 1)
-              myidstring = line[len(':attribute packet: '):-1]
-            elif fields[0] == ':signature':
-              id = fields[5]
-            elif id != myid and fields[0] == 'digest' and fields[1] == 'algo':
-              uidstring = self.get_hex2string(id)
-              hashalgo = int(fields[2][:-1])
-              fmt = '\t{algo:<{pad}} {id}  {uidstring}'
-              print fmt.format(algo=self.hashalgo_name(hashalgo),
-                               pad=self.hashalgomax,
-                               id=id[-8:],
-                               uidstring=uidstring)
-    return 0
-  
-  def get_hex2string(self, keyid, getuid = 0):
+  def get_hex2string(self, keyid, getuid = 1):
     """
     Get the human readable string for an ID (by default the first uid).
-    Optionally a given uid can be specified (NOTE: this is relative 
+    Optionally a given uid can be specified (NOTE: this is relative
     to the order of uid's provided from gpg --list-key ID)
 
     If the string is not available it is probably because the user
@@ -553,31 +174,19 @@ class KSPSig(object):
     performed with % gpg --recv-keys ID
     """
 
-    uidstring = '[User ID # %d for key: %s not found]' % (getuid + 1, keyid)
-    self.gnupg = GnuPGInterface.GnuPG()
-    self.gnupg.options.quiet = 1
-    self.gnupg.options.armor = 0
-    self.gnupg.options.homedir = self.options.gnupghome
-    p1 = self.gnupg.run(['--list-key', keyid], create_fhs=['stdout', 'stderr'])
-    lines = p1.handles['stdout'].readlines()
-    p1.handles['stdout'].close()
-    try:
-      p1.wait() # process cleanup
-    except IOError:
-      return uidstring
-    uid = -1 # first uid will be 0
+    # uidstring = '[User ID #%d not found for: %s]' % (getuid, keyid)
+    uidstring = '[uid#%d %s]' % (getuid, keyid)
+    gpg = os.popen('gpg --homedir ' + self.args.gnupghome + ' --with-colons --list-key ' + keyid + ' 2> /dev/null')
+    lines = gpg.readlines()
+    gpg.close()
+    uid = 0
     for line in lines:
-      tag = line[0:3]
-      keyid = line[13:21]
-      # if we have seen a uid then pub or sub means we are done
-      if uid > 0 and (tag == 'pub' or tag == 'sub'):
-        break
-      else:
-        if tag == 'uid':
-          uid += 1
-          if uid == getuid:
-            uidstring = line[3:].strip()
-            break
+      fields = line.split(':')
+      if len(fields) > 9 and fields[0] == 'uid':
+        uid += 1
+        if uid == getuid:
+          uidstring = fields[9]
+          break
     return uidstring
 
   def get_string2hex(self, keyid):
@@ -594,32 +203,361 @@ class KSPSig(object):
     This important later on because gpg --list-packets uses 16 digit keys.
     """
     hexid = None
-    self.gnupg = GnuPGInterface.GnuPG()
-    self.gnupg.options.quiet = 1
-    self.gnupg.options.armor = 0
-    self.gnupg.options.homedir = self.options.gnupghome
-    p1 = self.gnupg.run(['--keyid-format', 'long', '--list-key', keyid], create_fhs=['stdout', 'stderr'])
-    lines = p1.handles['stdout'].readlines()
-    p1.handles['stdout'].close()
-    try:
-      p1.wait() # process cleanup
-    except IOError:
-      return hexid
-    uid = -1 # first uid will be 0
+    gpg = os.popen('gpg --homedir ' + self.args.gnupghome + ' --with-colons --list-key ' + keyid + ' 2> /dev/null')
+    lines = gpg.readlines()
+    gpg.close()
     for line in lines:
-      if self.options.verbose:
-        print line,
-      tag = line[0:3]
-      if tag == 'pub':
-        hexid = line[12:28] # simply use the last one (may be multiple matches!)
+      fields = line.split(':')
+      if len(fields) > 4 and fields[0] == 'pub':
+        hexid = '0x' + fields[4]
+        break
     return hexid
 
+  def is_hex(self, id):
+    """
+    Return True if id is at least 8 characters long and is
+    valid hexadecimal.
+    """
+    ishex = False
+    if len(id) >= 8:
+      try:
+        h = int(id, 16)
+        ishex = True
+      except ValueError:
+        pass
+    return ishex
+
+  def get_key(self, key, default=False):
+    """
+    If default==True this will find the default ID to use
+      by looking for the first 'default-key' setting in gpg.conf, or
+      the first secret key.
+    Will return a tuple (key, key_string) which is the hexid
+    and first UID for key.
+    """
+    key_string = ''
+    if default and not key:
+      gpgconf = os.path.expanduser(self.args.gnupghome + '/gpg.conf')
+      if os.path.exists(gpgconf):
+        gpgconf_file = open(gpgconf)
+        lines = gpgconf_file.readlines()
+        gpgconf_file.close()
+        for line in lines:
+          fields = line.split()
+          if len(fields) > 1 and fields[0] == 'default-key':
+            key = ' '.join(fields[1:])
+            # print('DEBUG found default-key: %s' % key)
+            break
+      if not key: # get the first secret key
+        gpg = os.popen('gpg --homedir ' + self.args.gnupghome + ' --with-colons --list-secret-keys')
+        lines = gpg.readlines()
+        gpg.close()
+        line = lines[0]
+        fields = line.split(':')
+        if len(fields) < 10:
+          sys.exit(self.error('Unable to list secret-keys'))
+        if fields[0] != 'sec':
+          sys.exit(self.error('Error in --list-secret-keys: %s' % line))
+        key = fields[4]
+        # print('DEBUG found first secret key: %s' % key)
+    if self.is_hex(key):
+      # insure that we have a full 16 digit hex key
+      key = self.get_string2hex(key)
+    else:
+      # insure that we have a full 16 digit hex key
+      hexid = self.get_string2hex(key)
+      if hexid:
+        key = hexid
+      else:
+        sys.exit(self.error('ID is not found in the keyring: %s' % key))
+    key_string = self.get_hex2string(key)
+    return (key, key_string)
+
+  def incoming(self):
+    """
+    Function to display the hash algorithm used by signatures sent
+    to you by others at a Key Signing Party.  Typically caff sends
+    out an e-mail with an attachment of the form:
+
+    0x1111222233334444.1.signed-by-0x5555666677778888.asc
+
+    Where the first hex string is the users ID (followed by the uid),
+    the second hex string is the signatory ID.
+
+    If the user stores all of these (as yet unimported) signatures
+    in a given directory then (since this is the default action) this
+    program can be run as simply as:
+
+    % kspsig *.asc
+
+    NOTE: function has been expanded to support any filename (*.asc)
+    and print out the public key and UID for which the following
+    signatures are made.
+    """
+    for sigpath in self.args.incoming:
+      if not os.path.exists(sigpath):
+        return self.error('cannot open: %s' % sigpath, 6)
+      else:
+        sig = os.path.basename(sigpath)
+        print('file:     %s' % sig)
+        fields = sig.split('.')
+        skey = fields[0]
+        suid = fields[1]
+        sby = fields[2].split('-')[2]
+        if not skey or not suid or not sby:
+          return self.error('filename not in the format of SIGNEDKEY.UID.SIGNEDBY: %s' % sigpath)
+        myid = None
+        uidstring = None
+        hashalgo = 0
+        gpg = os.popen('gpg --list-packets ' + sigpath)
+        lines = gpg.readlines()
+        gpg.close()
+        packet = None
+        keyid = None
+        uidstring = 'Unknown'
+        hashalgo = 'Unknown'
+        firstsig = False
+        for line in lines:
+          fields = line.split(':')
+          if len(fields) > 1:
+            fields[1] = fields[1].strip()
+            if fields[1] == 'public key packet':
+              packet = fields[1]
+            elif fields[1] == 'user ID packet':
+              packet = fields[1]
+              uidstring = fields[2].strip()
+            elif fields[1] == 'signature packet':
+              packet = fields[1]
+              i = fields[2].find('algo ')
+              j = fields[2].find(', keyid ')
+              if i >= 0 and j > 0:
+                algo = fields[2][i + 5:j] # SIGNATURE algo!
+                keyid = '0x' + fields[2][j + 8:].strip()
+            elif packet == 'public key packet' and fields[0] == 'keyid':
+              keyid = '0x' + fields[2].strip()
+              if keyid != skey:
+                self.error("The filename claims to sign key %s but the actual data is signing the key %s" % (skey, keyid))
+          elif packet == 'signature packet' and keyid != skey:
+            i = line.find('digest algo ')
+            j = line.find(', begin')
+            if i >= 0 and j > i:
+              hashalgo = line[i + 12:j]
+              if not firstsig:
+                print('  SIGNED  %s UID %s = %s' % (skey, suid, uidstring))
+                firstsig = True
+              print('    BY %s = %s WITH %s' %
+                    (keyid, self.get_hex2string(keyid),
+                       self.hashalgo_name(hashalgo)))
+    return 0
+
+  def list_sigs_pub(self, fields):
+    "Handler for list_sigs()"
+    # pub
+    # pubalgo
+    # key length
+    # key
+    # creation data
+    # capability
+    # expires
+    fmt = '%%-%ds %%s %%s %%s 0x%%s %%s %%s %%s' % self.hashalgo_max
+    print(fmt %
+          (' ', fields[0], self.pubalgo_name(fields[3]), fields[2],
+             fields[4],
+             timestamp_to_date(fields[5]), capability(fields[11]),
+             expires_to_date(fields[6])))
+
+  def list_sigs_fpr(self, fields):
+    "Handler for list_sigs()"
+    pass
+    # fpr
+    # fingerprint
+    # print('%s %s' %
+    #       (fields[0], fields[9]))
+
+  def list_sigs_uid(self, fields):
+    "Handler for list_sigs()"
+    # field[0] is the integer number of the UID
+    # fpr
+    # fingerprint
+    fmt = '%%-%ds uid #%%d  %%s %%s' % self.hashalgo_max
+    print(fmt %
+          (' ', fields[0], validity(fields[1]), fields[9]))
+
+  def list_sigs_sig(self, fields):
+    "Handler for list_sigs()"
+    # hashalgo
+    # sig
+    # sigclass
+    # keyid
+    # creation data
+    # uid
+    uid = self.get_hex2string(fields[4])
+    fmt = '%%-%ds %%s %%s  %%s %%s  %%s' % self.hashalgo_max
+    print(fmt %
+          (self.hashalgo_name(fields[15]), fields[0],
+             signature_class(fields[10]), fields[4],
+             timestamp_to_date(fields[5]), uid))
+
+  def list_sigs_unk(self, fields):
+    "Handler for list_sigs()"
+    pass
+    # print('%s [this record type not yet handled by %s]' %
+    #       (fields[0], self.args.program))
+
+  def list_sigs(self, homedir, principal, signatory = None):
+    """
+    Common function for signatures() and outgoing() to show
+    signature strength (hash algorithm) of the signers (or just one signatory).
+    """
+    cmd = 'gpg --homedir %s --with-colons --list-sigs %s' % (homedir, principal)
+    gpg = os.popen(cmd)
+    lines = gpg.readlines()
+    gpg.close()
+    uid = 0
+    for line in lines:
+      fields = line.split(':')
+      if len(fields) > 0:
+        record = fields[0]
+        if record == 'uid':
+          uid += 1
+          fields[0] = uid # special case for uid
+        elif record == 'sig' and signatory and '0x' + fields[4] != signatory:
+          continue
+        elif record == 'sub':
+          break # don't bother with sigs on subkeys
+        elif not record in self.list_sigs_handlers:
+          record = 'unk'
+        self.list_sigs_handlers[record](fields)
+    return 0
+
+  def outgoing(self):
+    """
+    This function is indended to help users understand what
+    hash algorithm has been used to sign other people's keys
+    after a Key Signing Party when they have used caff.
+
+    It certainly may be possible to inspect the output
+    of self.args.caffhome + '/keys' but this implementation
+    will use the caff separate public ring:
+    self.args.caffhome + '/gnupghome/pubring.gpg'.
+
+    This function uses the CAFFHOME keyring as that is the typical
+    place where outgoing signatures are stored.  Of course CAFFHOME
+    can be overidden as a command line argument to inspect (more
+    generally) how KEY signed OUTGOING (set --caffhome to ~/.gnupg )
+    """
+    # if self.args.verbose:
+    #   print('Outgoing signatures of %s = %s\n  BY %s = %s' %
+    #         (self.args.outgoing, self.outgoing_string,
+    #            self.args.key, self.key_string))
+    return self.list_sigs(self.args.caffhome,
+                         self.args.outgoing, self.args.key)
+
+  def signatures(self):
+    """
+    Print hash algorithm for signatures for the ID
+    """
+    return self.list_sigs(self.args.gnupghome, self.args.key)
+
+  def run(self):
+    "Dispatch on action"
+    return getattr(self, self.args.action)()
+
+
 def main():
-  kspsig = KSPSig()
-  kspsig.parse_args(sys.argv[1:])
-  rv = kspsig.do_action()
-  sys.exit(rv)
+  program = sys.argv[0]
+  if program[0] != '/':
+    program = os.path.join(os.getcwd(), program)
+  pdir = os.path.normpath(os.path.dirname(program))
+  program = os.path.basename(program)
+  envvar = program.upper()
+  envval = None
+  envargs = []
+  if envvar in os.environ:
+    envval = os.environ[envvar]
+    envargs = envval.split()
+  while len(envargs): # add env args
+    sys.argv.insert(1, envargs.pop())
+  kspsig_envar = textwrap.dedent('''
+    The KSPSIG environment var may be set to one (or more)
+    command line arguments (processed before the actual command line)
+    for example:
+    $ KSPSIG="--quiet --no-pedantic" kspsig -v -i *.asc
+    ''')
+  parser = argparse.ArgumentParser(
+    formatter_class=argparse.RawDescriptionHelpFormatter,
+    epilog=kspsig_envar)
+  parser.add_argument('-V', '--version', action='version',
+                      version=KSPSig.VERSION)
+  parser.add_argument('-v', '--verbose', action='store_true',
+                      help='verbose mode')
+  parser.add_argument('-q', '--quiet', action='store_true',
+                      help='quiet mode (turns off verbose)')
+  parser.add_argument('-p', '--no-pedantic', action='store_true',
+                      help='do not emit pedantic warnings')
+  # we don't set a default here because the user may override gnupghome
+  parser.add_argument('-k', '--key', help='ID to check')
+  gnupghome_default = '~/.gnupg'
+  parser.add_argument('-g', '--gnupghome', default=gnupghome_default,
+                      help='GnuPG home directory [%s]' % gnupghome_default)
+  caffhome_default = '~/.caff/gnupghome'
+  parser.add_argument('-c', '--caffhome', default=caffhome_default,
+                      help='caff GnuPG home directory [%s]' % caffhome_default)
+  # additional args for incoming or signatures
+  parser.add_argument('args', nargs=argparse.REMAINDER,
+                      help='arguments for the default action')
+  # ACTIONS -------------------
+  parser.add_argument('-i', '--incoming', nargs='+',
+                      help='check incoming signature file(s) (default action)')
+  parser.add_argument('-o', '--outgoing',
+                      help='check signature of OUTGOING by KEY')
+  parser.add_argument('-s', '--signatures', action='store_true',
+                      help='check signatures for key')
+  args = parser.parse_args()
+  args.program = program
+  args.pdir = pdir
+  args.action = None
+  if args.outgoing:
+    args.action = 'outgoing'
+  if args.signatures:
+    if args.action:
+      print('must specify only one action: --signatures --incoming --outgoing')
+      sys.exit(1)
+    else:
+      args.action = 'signatures'
+      if not args.key and len(args.args) == 1:
+        args.key = args.args[0]
+  if args.incoming:
+    if args.action:
+      print('must specify only one action: --signatures --incoming --outgoing')
+      sys.exit(1)
+    else:
+      args.action = 'incoming'
+  if not args.action:
+    args.action = 'incoming' # default action
+    args.incoming = args.args
+    args.args = []
+  if args.quiet:
+    args.verbose = False
+  args.gnupghome = os.path.expanduser(args.gnupghome)
+  if not os.path.exists(args.gnupghome):
+    print('GNUPGHOME not found: %s' % args.gnupghome)
+    sys.exit(1)
+  args.caffhome = os.path.expanduser(args.caffhome)
+  if not os.path.exists(args.caffhome):
+    print('warning: CAFFHOME not found: %s' % args.caffhome)
+    # sys.exit(1)
+  if args.verbose:
+    print('%s version %s from %s' % (args.program, KSPSig.VERSION, args.pdir))
+    print('action: %s %s' % (args.action, str(args.args)))
+    print('incoming: %s' % str(args.incoming))
+    print('outgoing: %s' % args.outgoing)
+    print('no-pedantic: %s' % str(args.no_pedantic))
+    print('key: %s' % args.key)
+    print('GNUPGHOME: %s' % args.gnupghome)
+    print('CAFFHOME: %s' % args.caffhome)
+    print('args from %s: %s' % (envvar,envval))
+  return KSPSig(args).run()
 
 if __name__ == '__main__':
-  main()
-
+  sys.exit(main())

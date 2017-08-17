@@ -21,11 +21,20 @@ $ kspsig 0x40BFEE868B055D9B.1.signed-by-0x542AA88AAD5896AD.asc
         SHA256    AD5896AD  Joe Hacker <joe@hacker.net>
 $ gpg --import 0x40BFEE868B055D9B.1.signed-by-0x542AA88AAD5896AD.asc
 
-See the man page for additional documentation and examples
-
 
 News
 ----
+
+As of version 0.9.0
+- Switch from python 2 to python 3
+- Remove dependency on any python gpg library (just use gpg directly)
+- The old debian packaging has been removed (and needs to be updated)
+- Added examples/ directory (for future PR's which demonstrate bugs)
+
+NOTE:
+
+Never use 32 bit hex id's to identify keys: see http://evil32.com
+(use 0x40BFEE868B055D9A not just 0x8B055D9A)
 
 An ITP has been filed for this program #594907
   http://bugs.debian.org/cgi-bin/bugreport.cgi?bug=594907
@@ -34,37 +43,11 @@ However it has been suggested that it be combined with signing-party
 and thus the following bug has been opened #595060
   http://bugs.debian.org/cgi-bin/bugreport.cgi?bug=595060
 
-In the meantime you may add this package to a Debian unstable
-system by adding the info9 repository as a source.  The easiest
-way to do this is simply:
-# cp /usr/share/doc/kspsig/info9.net.list /etc/apt/sources.list.d/
-
-The /etc/apt/sources.list.d/info9.net.list should contain:
-deb http://info9.net/debian/ unstable/
-deb-src http://info9.net/debian/ unstable/
-
-To avoid APT warnings about unverifyable packages or if you trust me
-then you can add my key to your APT key ring:
-% gpg --recv-key 0x40BFEE868B055D9A
-% gpg --armor --export 0x40BFEE868B055D9A | sudo apt-key add -
-
-
-Requirements
-------------
-
-Depends on python 2.6 and python-gnupginterface (and thus gpg).
-Although not strictly required it is assumed that caff is also installed.
-It may work on later versions of python 2.x, but it is not
-tested with python 3.
-
-The man page can be regenerated using help2man with:
-$ help2man --output kspsig.1 --include=kspsig.h2m kspsig
-
 
 License
 -------
 
-Copyright (c) 2010 Tom Marble
+Copyright (c) 2010-2017 Tom Marble
 
 Licensed under GPLv3 or later http://www.gnu.org/licenses/gpl-3.0.txt
 The full text of the license is available in LICENSE and
@@ -124,9 +107,9 @@ Once you have caff configured for a strong signature algorithm
 you may be asked to re-sign some keys.  Here is an approach:
 
 1. Delete the weak signature(s) on your signature (caff) keyring
-   (e.g. you signed DEADCAFF with SHA1):
+   (e.g. you signed 0xDEADCAFF with SHA1):
 
-  $ gpg --homedir=~/.caff/gnupghome --secret-keyring ~/.gnupg/secring.gpg --no-auto-check-trustdb --trust-model=always --edit-key DEADCAFF
+  $ gpg --homedir=~/.caff/gnupghome --secret-keyring ~/.gnupg/secring.gpg --no-auto-check-trustdb --trust-model=always --edit-key 0xDEADCAFF
   gpg> uid 1
   gpg> delsig
   gpg> save
@@ -136,20 +119,21 @@ you may be asked to re-sign some keys.  Here is an approach:
 
 2. Re-sign with caff
 
-   $ caff --no-download DEADCAFF
+   $ caff --no-download 0xDEADCAFF
 
 3. Verify the new signature
 
-   $ kspsig --outgoing=DEADCAFF
+   $ kspsig --outgoing 0xDEADCAFF
 
 4. If the new signature doesn't use the algorithm you intended
    then try to reconfigure caff and goto step 1.
+
 
 Sample Letter
 -------------
 
 To: Joe Hacker <joe@hacker.net>
-Subject: Resign with stronger signature? [was Re: Your signed PGP key ...]
+Subject: Re-sign with stronger signature? [was Re: Your signed PGP key ...]
 
 Thank you for signing my key at KEY SIGNING PARTY.
 
@@ -178,6 +162,60 @@ Please let me know if you have any questions,
 [2] http://www.debian-administration.org/users/dkg/weblog/48
 
 
+Usage Examples
+--------------
+
+# Verify incoming signatures
+$ ./kspsig examples/0x40BFEE868B055D9A.1.signed-by-0xDB221A6900000011.asc
+file:     0x40BFEE868B055D9A.1.signed-by-0xDB221A6900000011.asc
+  SIGNED  0x40BFEE868B055D9A UID 1 = "Tom Marble <tmarble@info9.net>"
+    BY 0xDB221A6900000011 = Keith Packard <keithp@keithp.com> WITH SHA256
+
+# How did I sign someone's key?
+$ kspsig --caffhome ~/.gnupg -o tmancill@debian.org
+          pub RSA 4096 0x21D20589974B3E96 2010-07-19 [SC]
+          uid #1  [full] tony mancill <tmancill@debian.org>
+SHA512    sig    40BFEE868B055D9A 2010-09-02  Tom Marble <tmarble@info9.net>
+          uid #2  [full] tony mancill <tony@mancill.com>
+SHA512    sig    40BFEE868B055D9A 2010-09-02  Tom Marble <tmarble@info9.net>
+
+# How did someone sign my key?
+$ kspsig --key 0x21D20589974B3E96 --caffhome ~/.gnupg --outgoing 0x40BFEE868B055D9A
+          pub RSA 4096 0x40BFEE868B055D9A 2010-07-26 [SC]
+          uid #1  [ultimate] Tom Marble <tmarble@info9.net>
+SHA1      sig    21D20589974B3E96 2010-08-06  tony mancill <tmancill@debian.org>
+
+# How did a third person sign someone's key
+$ kspsig --key miguel@miguel.cc --caffhome ~/.gnupg --outgoing tmancill@debian.org
+          pub RSA 4096 0x21D20589974B3E96 2010-07-19 [SC]
+          uid #1  [full] tony mancill <tmancill@debian.org>
+SHA512    sig    6E608B637D8967E9 2014-09-09  Miguel Landaeta <miguel@miguel.cc>
+          uid #2  [full] tony mancill <tony@mancill.com>
+SHA512    sig    6E608B637D8967E9 2014-09-09  Miguel Landaeta <miguel@miguel.cc>
+SHA512    sig    6E608B637D8967E9 2014-09-09  Miguel Landaeta <miguel@miguel.cc>
+SHA512    sig    6E608B637D8967E9 2014-09-09  Miguel Landaeta <miguel@miguel.cc>
+
+# show the strengh of all signatures on my key
+./kspsig --signatures
+
+# show the strengh of all signatures on someone's key
+$ kspsig -s 0xDB221A6900000011
+          pub RSA 4096 0xDB221A6900000011 2012-03-15 [ESCA]
+          uid #1  [full] Keith Packard <keithp@keithp.com>
+SHA1      sig    E74D29B82BE16D01 2013-08-13  Moray Allan <moray@sermisy.org>
+SHA256    sig    E106481EEDF008C5 2013-08-25  [uid#1 E106481EEDF008C5]
+SHA1      sig    79BE3E4300411886 2013-10-02  Linus Torvalds <torvalds@linux-foundation.org>
+
+
+Bugs
+----
+
+There are certainly bugs in kspsig related to multiple UID's
+and non-standard UID's (e.g. JPEG images). Please file issues
+and / or make pull requests to add example files in the
+examples/ directory (in order to reproduce the bug).
+
+
 See Also
 --------
 
@@ -189,10 +227,4 @@ http://keyring.debian.org/creating-key.html
 http://lists.debian.org/debian-devel-announce/2009/05/msg00005.html
 http://bugs.debian.org/cgi-bin/bugreport.cgi?bug=527944
 http://www.gag.com/bdale/blog/posts/Strong_Keys.html
-
-To Do
------
-
-- Peer review of the approach of using gpg --export and
-  gpg --list-packets
-- Consider rewriting with direct access to the keyrings
+https://evil32.com/
