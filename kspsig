@@ -300,12 +300,17 @@ class KSPSig:
       else:
         sig = os.path.basename(sigpath)
         print('file:     %s' % sig)
+        skey = None
+        suid = None
+        sby = None
         fields = sig.split('.')
-        skey = fields[0]
-        suid = fields[1]
-        sby = fields[2].split('-')[2]
-        if not skey or not suid or not sby:
-          return self.error('filename not in the format of SIGNEDKEY.UID.SIGNEDBY: %s' % sigpath)
+        if len(fields) > 2:
+          skey = fields[0]
+          suid = fields[1]
+          sby = fields[2].split('-')[2]
+        # this could be just a warning
+        # if not skey or not suid or not sby:
+        #   return self.error('filename not in the format of SIGNEDKEY.UID.SIGNEDBY: %s' % sigpath)
         myid = None
         uidstring = None
         hashalgo = 0
@@ -333,17 +338,20 @@ class KSPSig:
               if i >= 0 and j > 0:
                 algo = fields[2][i + 5:j] # SIGNATURE algo!
                 keyid = '0x' + fields[2][j + 8:].strip()
-            elif packet == 'public key packet' and fields[0] == 'keyid':
-              keyid = '0x' + fields[2].strip()
-              if keyid != skey:
-                self.error("The filename claims to sign key %s but the actual data is signing the key %s" % (skey, keyid))
-          elif packet == 'signature packet' and keyid != skey:
+            elif packet == 'public key packet' and fields[0].strip() == 'keyid':
+              myid = '0x' + fields[1].strip()
+              # print('set M', myid)
+              # note we expect skey == myid
+              # if skey and myid != skey:
+              #   self.error("The filename claims to sign key %s but the actual data is signing the key %s" % (skey, myid))
+          elif packet == 'signature packet' and keyid != myid:
+            # print('K',keyid,'M',myid)
             i = line.find('digest algo ')
             j = line.find(', begin')
             if i >= 0 and j > i:
               hashalgo = line[i + 12:j]
               if not firstsig:
-                print('  SIGNED  %s UID %s = %s' % (skey, suid, uidstring))
+                print('  SIGNED  %s UID %s = %s' % (myid, keyid, uidstring))
                 firstsig = True
               print('    BY %s = %s WITH %s' %
                     (keyid, self.get_hex2string(keyid),
